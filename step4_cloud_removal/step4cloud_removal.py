@@ -10,6 +10,7 @@ Author: Hsiao-Jou Hsu
 License: MIT
 """
 
+import csv
 import glob
 import json
 import logging
@@ -95,6 +96,26 @@ def image_dtype(true_bits):
     for storage_bits in (8, 16, 32, 64):
         if true_bits <= storage_bits:
             return 'uint' + str(storage_bits)
+
+FILL_LOG_NAME = 'fill_log.csv'
+FILL_LOG_COLUMNS = ['window', 'patch', 'candidate', 'ssim', 'clear_fraction',
+                    'filled', 'pixels', 'note']
+
+def write_fill_log(rows, path=FILL_LOG_NAME):
+    """Write the per-patch fill log (one row per candidate tried) as CSV.
+
+    Columns: ``window`` (0-based index into ``allWindow.npy``), ``patch``
+    (cloud-patch file name in the working folder, unique within a window),
+    ``candidate`` (candidate scene, empty if none passed ``ssim_threshold``),
+    ``ssim``, ``clear_fraction`` (clear share of the patch in the candidate's
+    cloud mask, empty if not reached), ``filled`` (``yes``/``no``),
+    ``pixels`` (cloud-patch pixel count) and ``note`` (why a candidate was
+    not used). The log is for inspection only; nothing reads it back.
+    """
+    with open(path, 'w', newline='') as f:
+        writer = csv.DictWriter(f, fieldnames=FILL_LOG_COLUMNS)
+        writer.writeheader()
+        writer.writerows(rows)
 
 def score_candidates(candidate_files, cloud_files, candidate_folder, cloud_folder,
                      mosaic_xs, land_sea_mask, res, img_bits, excluded_scenes=()):
@@ -228,6 +249,7 @@ def main():
     mosaic_pan=rasterio.open(mosaic_pan_path)
     pan_origin=mosaic_pan.transform[2],mosaic_pan.transform[5]
     mosaic_pan.close()
+    fill_log = []
 
     for i in range(len(ReadOrder)-1):
 
@@ -352,16 +374,25 @@ def main():
                 PancldWin=Window((cld_gt[2]-pan_origin[0])/pan_res ,(pan_origin[1]-cld_gt[5])/pan_res , width=cld_ds.width*(res/pan_res) ,height=cld_ds.height*(res/pan_res)  )
 
                 TaicldWin=Window((cld_gt[2]-cloudmask_transform[2])/res,(cloudmask_transform[5]-cld_gt[5])/res, width=cld_ds.width ,height=cld_ds.height  )  #big cld mask
+                patch_pixels=int(np.count_nonzero(cld_ds.read(1)==1))
 
 
                 ssimIndex=np.argsort(ssim[:,a])
                 a+=1
                 ss=0
+                if np.count_nonzero(ssim[:,a-1]>=ssim_threshold)==0:
+                    fill_log.append({'window': i, 'patch': j, 'candidate': '',
+                                     'ssim': round(float(ssim[ssimIndex[-1],a-1]),4) if len(file) else '',
+                                     'clear_fraction': '', 'filled': 'no', 'pixels': patch_pixels,
+                                     'note': 'no candidate reaches ssim_threshold'})
                 for s in list(range(1,np.count_nonzero(ssim[:,a-1]>=ssim_threshold)+1)):
                     if ss==0:
                         if ssim[ssimIndex[-s],a-1]>= ssim_threshold:#set threshold to filter not good enough img.
 
                             fName=file[ssimIndex[-s]]
+                            log_row={'window': i, 'patch': j, 'candidate': fName,
+                                     'ssim': round(float(ssim[ssimIndex[-s],a-1]),4),
+                                     'clear_fraction': '', 'filled': 'no', 'pixels': patch_pixels, 'note': ''}
 
                             with rasterio.open(candidate_img_path+os.sep+fName) as imagePool:
 
@@ -395,6 +426,7 @@ def main():
                                         patch_codes = cldb[cld==1]
                                         clear_fraction = (np.count_nonzero(patch_codes < 10) / patch_codes.size
                                                           if patch_codes.size else 0.0)
+                                        log_row['clear_fraction']=round(float(clear_fraction),4)
 
                                         imgrgb=imagePool.read(window=write_window)
 
@@ -554,14 +586,24 @@ def main():
                                                     dst.write( outcome, 1, window= from_bounds(win_transform[2], win_transform[5]-ints_window.height*res, win_transform[2]+ints_window.width*res, win_transform[5], dst.transform ) )
                                                 del outcome,smallpan,bigpan
                                                 ss=1
+                                                log_row['filled']='yes'
+                                        elif np.any(imgrgb[0,:,:][cld==1]==0):
+                                            log_row['note']='candidate has no data in the patch'
+                                        else:
+                                            log_row['note']='candidate too cloudy (cloud_tolerance)'
+                                    else:
+                                        log_row['note']='cloud reaches the edge of the candidate overlap (skipped)'
 
 
                                 except rasterio.errors.WindowError as error:
                                     logger.debug("Cloud filling skipped for patch %s, candidate %s: %s",
                                                  j, fName, error)
+                                    log_row['note']='candidate does not overlap the patch'
                                 except Exception as error:
                                     logger.warning("Cloud filling failed for patch %s, candidate %s: %s",
                                                    j, fName, error, exc_info=True)
+                                    log_row['note']=f'error: {type(error).__name__}: {error}'
+                            fill_log.append(log_row)
 
         print('stage2:',stage2)
         print('cldzeroNum:',cldzeroNum)
@@ -574,9 +616,11 @@ def main():
                 shutil.rmtree(filepath)
             except OSError:
                 os.remove(filepath)
+        write_fill_log(fill_log)
 
 
     land_sea_mask.close()
+    write_fill_log(fill_log)
     print('All done!')
     print(Count,'/',total,' reconstructions of cloud-contaminated area')
     end = timer()
