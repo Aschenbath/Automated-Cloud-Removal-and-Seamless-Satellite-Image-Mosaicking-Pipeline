@@ -907,6 +907,30 @@ def buildGraph(data_final,data_final2,height,width,path_method,trueID_intersect,
     return seamlinef
 
 
+def find_seamline(kernel,imgg1_ui8_nd_gy,imgg2_ui8_nd_gy,fr,fc,path_method,trueID_intersect,
+                  image1_ds,image2_ds):
+    """Seamline between two scenes: :func:`clipImg` + :func:`buildGraph`, with retries.
+
+    The search runs first with the ``kernel`` from ``para.txt``. If that
+    fails, it is repeated with kernel 11 and the masked-pixel fallback of
+    :func:`buildGraph`. A :class:`SeamlineNotFoundError` naming both scenes
+    is raised if :func:`MakeTrueID` did not find exactly two seamline
+    endpoints (the footprints of the two scenes do not cross cleanly).
+    """
+    if len(trueID_intersect)!=2:
+        raise SeamlineNotFoundError(
+            f"Expected 2 seamline endpoints where the footprints of {image1_ds} and {image2_ds} "
+            f"cross, found {len(trueID_intersect)}. Check the overlap and the no-data borders "
+            "of these scenes (see docs/TROUBLESHOOTING.md, 'intersection goes awry').")
+    try:
+        data_final,data_final2,height, width=clipImg(kernel,imgg1_ui8_nd_gy,imgg2_ui8_nd_gy,fr,fc)
+        return buildGraph(data_final,data_final2,height,width,path_method,trueID_intersect)
+    except Exception:
+        data_final,data_final2,height, width=clipImg(11,imgg1_ui8_nd_gy,imgg2_ui8_nd_gy,fr,fc)
+        return buildGraph(data_final,data_final2,height,width,path_method,trueID_intersect,
+                          masked_fallback=True)
+
+
 def clipImg(usrset,imgg1_ui8_nd_gy,imgg2_ui8_nd_gy,fr,fc):
     """Restrict both scenes to the area in which the seamline may run.
 
@@ -1392,17 +1416,9 @@ def main():
             gc.collect()
 
             fc,fr,trueID_intersect=MakeTrueID(intersection_points,imgg1_ui8_nd_gy,imgg2_ui8_nd_gy,gt,res,scale_factor)
-            if len(trueID_intersect)==2:
-                try:
-                    data_final,data_final2,height, width=clipImg(kernel,imgg1_ui8_nd_gy,imgg2_ui8_nd_gy,fr,fc)
-                    seamlinef=buildGraph(data_final,data_final2,height,width,path_method,trueID_intersect)
-                except:
-                    data_final,data_final2,height, width=clipImg(11,imgg1_ui8_nd_gy,imgg2_ui8_nd_gy,fr,fc)
-                    seamlinef=buildGraph(data_final,data_final2,height,width,path_method,trueID_intersect,
-                                         masked_fallback=True)
-            else:
-                print("please check the intersection of image: " +image1_ds+' and image: '+image2_ds)
-            del  data_final,data_final2,imgg1_ui8_nd_gy,imgg2_ui8_nd_gy
+            seamlinef=find_seamline(kernel,imgg1_ui8_nd_gy,imgg2_ui8_nd_gy,fr,fc,path_method,
+                                    trueID_intersect,image1_ds,image2_ds)
+            del  imgg1_ui8_nd_gy,imgg2_ui8_nd_gy
             print('Generating seamline ...')
             x=round((gt[2]-union_gt[2])/(res/scale_factor) ) # col
             y=round((union_gt[5]-gt[5])/(res/scale_factor) ) # row
@@ -1729,17 +1745,9 @@ def main():
             gc.collect()
 
             fc,fr,trueID_intersect=MakeTrueID(intersection_points,imgg1_ui8_nd_gy,imgg2_ui8_nd_gy,gt,res,scale_factor)
-            if len(trueID_intersect)==2:
-                try:
-                    data_final,data_final2,height, width=clipImg(kernel,imgg1_ui8_nd_gy,imgg2_ui8_nd_gy,fr,fc)
-                    seamlinef=buildGraph(data_final,data_final2,height,width,path_method,trueID_intersect)
-                except:
-                    data_final,data_final2,height, width=clipImg(11,imgg1_ui8_nd_gy,imgg2_ui8_nd_gy,fr,fc)
-                    seamlinef=buildGraph(data_final,data_final2,height,width,path_method,trueID_intersect,
-                                         masked_fallback=True)
-            else:
-                print("please check the intersection of image: " +image1_ds+' and image: '+image2_ds)
-            del  data_final,data_final2,imgg1_ui8_nd_gy,imgg2_ui8_nd_gy
+            seamlinef=find_seamline(kernel,imgg1_ui8_nd_gy,imgg2_ui8_nd_gy,fr,fc,path_method,
+                                    trueID_intersect,image1_ds,image2_ds)
+            del  imgg1_ui8_nd_gy,imgg2_ui8_nd_gy
             print('Generating seamline ...')
             x=round((gt[2]-union_gt[2])/(res/scale_factor) ) # col
             y=round((union_gt[5]-gt[5])/(res/scale_factor) ) # row

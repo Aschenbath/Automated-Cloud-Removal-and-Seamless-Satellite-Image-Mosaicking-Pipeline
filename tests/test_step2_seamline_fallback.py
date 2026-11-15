@@ -56,3 +56,22 @@ def test_endpoint_outside_the_grid_is_a_clear_error(step2):
     img, _ = split_overlap()
     with pytest.raises(step2.SeamlineNotFoundError, match="outside"):
         step2.buildGraph(img, img.copy(), *img.shape, "a6c", (5, 10_000), masked_fallback=True)
+
+
+@pytest.mark.parametrize("ends", [(), (5,), (5, 40, 70)])
+def test_wrong_number_of_endpoints_names_both_scenes(step2, ends):
+    img = np.full((9, 9), 100, dtype=np.uint8)
+    with pytest.raises(step2.SeamlineNotFoundError, match=rf"a0000001\.img.*a0000003\.img.*found {len(ends)}"):
+        step2.find_seamline(5, img, img.copy(), [4, 4], [0, 8], "a6c", list(ends),
+                            "a0000001.img", "a0000003.img")
+
+
+def test_find_seamline_matches_clip_and_build_graph(step2):
+    rng = np.random.default_rng(11)
+    img1 = rng.integers(1, 255, (30, 30), dtype=np.uint8)
+    img2 = rng.integers(1, 255, (30, 30), dtype=np.uint8)
+    fr, fc = [0, 29], [15, 15]
+    ends = [0 * 30 + 15 + 1, 29 * 30 + 15 + 1]
+    expected = step2.buildGraph(*step2.clipImg(5, img1, img2, fr, fc), "a6c_int", ends)
+    seam = step2.find_seamline(5, img1, img2, fr, fc, "a6c_int", ends, "a.img", "b.img")
+    np.testing.assert_array_equal(seam, expected)

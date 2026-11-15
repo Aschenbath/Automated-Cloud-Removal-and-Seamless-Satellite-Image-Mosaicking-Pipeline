@@ -12,6 +12,7 @@ Known failure modes collected while running the pipeline operationally.
 
 **Symptom:** intersection points cannot be computed, or are wrong.
 **Cause:** pixels that should be `0` (outside the footprint) are not `0` — stray values along the scene border confuse the boundary polygonization.
+Step 2 then stops with `SeamlineNotFoundError: Expected 2 seamline endpoints ...`, naming both scenes.
 **Fix:** clean the scene borders before mosaicking; verify with the identify tool in QGIS/ArcMap that the area outside the footprint is exactly `0` in all bands.
 
 ## Step 2: `No road from target to endnode`
