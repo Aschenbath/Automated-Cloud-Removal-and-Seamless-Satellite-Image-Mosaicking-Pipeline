@@ -766,7 +766,55 @@ def border_connection(seamlineff,gt , union_gt,res,scale_factor,fc,fr ):
     
     return seamlineff3
 
-def buildGraph(data_final,data_final2,height,width,path_method,trueID_intersect):
+# Cost of one graph edge between masked or no-data pixels in the fallback
+# search of buildGraph. One such edge costs as much as 500 of the most
+# expensive valid edges (2e10, flat areas under a6c), so the fallback seamline
+# crosses as few masked pixels as it can and otherwise follows image edges.
+# It stays small enough that float64 sums still resolve valid edge weights.
+MASKED_EDGE_COST = 1e13
+
+
+class SeamlineNotFoundError(RuntimeError):
+    """No seamline could be found between the two endpoints of an overlap."""
+
+
+def masked_seamline_path(G, height, width, source, target, error):
+    """Cheapest *source*-*target* path once masked pixels may be crossed.
+
+    Adds every right and down neighbour edge of the height x width pixel grid
+    that is not yet in *G* (edges between masked or no-data pixels) with
+    weight :data:`MASKED_EDGE_COST`, then repeats the search. *G* is changed
+    in place. *error* is the exception from the first search, used in the
+    messages.
+    """
+    n_nodes = height * width
+    for node in (source, target):
+        if not 1 <= node <= n_nodes:
+            raise SeamlineNotFoundError(
+                f"Seamline endpoint {node} lies outside the {height} x {width} overlap grid "
+                f"({error}). Check the overlap of the two scenes.") from error
+    print(f"WARNING: no seamline through valid pixels ({error}). "
+          "Retrying with masked or no-data pixels allowed at a high cost; "
+          "check the seamline in the *_seamline.img output.")
+    added = 0
+    for x in range(1, n_nodes + 1):
+        if x % width != 0 and not G.has_edge(x, x + 1):
+            G.add_edge(x, x + 1, weight=MASKED_EDGE_COST)
+            added += 1
+        if x + width <= n_nodes and not G.has_edge(x, x + width):
+            G.add_edge(x, x + width, weight=MASKED_EDGE_COST)
+            added += 1
+    try:
+        path = nx.astar_path(G, source, target, heuristic=None, weight='weight')
+    except (nx.NetworkXNoPath, nx.NodeNotFound) as second_error:
+        raise SeamlineNotFoundError(
+            f"No seamline between nodes {source} and {target}, even with masked pixels "
+            f"allowed ({second_error}).") from error
+    print(f"WARNING: fallback seamline found; {added} masked edges were added to the graph.")
+    return path
+
+
+def buildGraph(data_final,data_final2,height,width,path_method,trueID_intersect,masked_fallback=False):
     """Find the seamline as the cheapest path through a sparse pixel graph.
 
     *data_final* and *data_final2* are the two (downsampled, 8-bit grayscale)
@@ -789,6 +837,16 @@ def buildGraph(data_final,data_final2,height,width,path_method,trueID_intersect)
     ``networkx.astar_path`` without a heuristic, which is Dijkstra's
     algorithm. Returns a (height, width) int array that is 1 on the
     seamline and 0 elsewhere.
+
+    If no path joins the two endpoints through valid pixels (for example
+    when snow, cloud or no-data splits the overlap), ``networkx.NetworkXNoPath``
+    or ``networkx.NodeNotFound`` is raised, as before. With
+    *masked_fallback* set, the search is instead repeated after linking the
+    remaining (masked or no-data) pixels with :data:`MASKED_EDGE_COST`
+    edges, so the seamline crosses as few masked pixels as possible and a
+    warning is printed. Results for inputs that already have a valid path do
+    not change. A :class:`SeamlineNotFoundError` is raised if even that fails
+    (an endpoint outside the grid).
     """
     G = nx.Graph()
     new_d=np.squeeze(np.asarray(data_final)).flatten()
@@ -836,12 +894,41 @@ def buildGraph(data_final,data_final2,height,width,path_method,trueID_intersect)
     source=trueID_intersect[0]
     target=trueID_intersect[1]
     
-    path = nx.astar_path(G, source, target, heuristic=None, weight='weight')
+    try:
+        path = nx.astar_path(G, source, target, heuristic=None, weight='weight')
+    except (nx.NetworkXNoPath, nx.NodeNotFound) as error:
+        if not masked_fallback:
+            raise
+        path = masked_seamline_path(G, height, width, source, target, error)
     seamline=np.zeros((width*height), dtype=int)
     for i in path:
         seamline[i-1]=1        
     seamlinef=np.resize(seamline,(height,width))
     return seamlinef
+
+
+def find_seamline(kernel,imgg1_ui8_nd_gy,imgg2_ui8_nd_gy,fr,fc,path_method,trueID_intersect,
+                  image1_ds,image2_ds):
+    """Seamline between two scenes: :func:`clipImg` + :func:`buildGraph`, with retries.
+
+    The search runs first with the ``kernel`` from ``para.txt``. If that
+    fails, it is repeated with kernel 11 and the masked-pixel fallback of
+    :func:`buildGraph`. A :class:`SeamlineNotFoundError` naming both scenes
+    is raised if :func:`MakeTrueID` did not find exactly two seamline
+    endpoints (the footprints of the two scenes do not cross cleanly).
+    """
+    if len(trueID_intersect)!=2:
+        raise SeamlineNotFoundError(
+            f"Expected 2 seamline endpoints where the footprints of {image1_ds} and {image2_ds} "
+            f"cross, found {len(trueID_intersect)}. Check the overlap and the no-data borders "
+            "of these scenes (see docs/TROUBLESHOOTING.md, 'intersection goes awry').")
+    try:
+        data_final,data_final2,height, width=clipImg(kernel,imgg1_ui8_nd_gy,imgg2_ui8_nd_gy,fr,fc)
+        return buildGraph(data_final,data_final2,height,width,path_method,trueID_intersect)
+    except Exception:
+        data_final,data_final2,height, width=clipImg(11,imgg1_ui8_nd_gy,imgg2_ui8_nd_gy,fr,fc)
+        return buildGraph(data_final,data_final2,height,width,path_method,trueID_intersect,
+                          masked_fallback=True)
 
 
 def clipImg(usrset,imgg1_ui8_nd_gy,imgg2_ui8_nd_gy,fr,fc):
@@ -1329,16 +1416,9 @@ def main():
             gc.collect()
 
             fc,fr,trueID_intersect=MakeTrueID(intersection_points,imgg1_ui8_nd_gy,imgg2_ui8_nd_gy,gt,res,scale_factor)
-            if len(trueID_intersect)==2:
-                try:
-                    data_final,data_final2,height, width=clipImg(kernel,imgg1_ui8_nd_gy,imgg2_ui8_nd_gy,fr,fc)
-                    seamlinef=buildGraph(data_final,data_final2,height,width,path_method,trueID_intersect)
-                except:
-                    data_final,data_final2,height, width=clipImg(11,imgg1_ui8_nd_gy,imgg2_ui8_nd_gy,fr,fc)
-                    seamlinef=buildGraph(data_final,data_final2,height,width,path_method,trueID_intersect)
-            else:
-                print("please check the intersection of image: " +image1_ds+' and image: '+image2_ds)
-            del  data_final,data_final2,imgg1_ui8_nd_gy,imgg2_ui8_nd_gy
+            seamlinef=find_seamline(kernel,imgg1_ui8_nd_gy,imgg2_ui8_nd_gy,fr,fc,path_method,
+                                    trueID_intersect,image1_ds,image2_ds)
+            del  imgg1_ui8_nd_gy,imgg2_ui8_nd_gy
             print('Generating seamline ...')
             x=round((gt[2]-union_gt[2])/(res/scale_factor) ) # col
             y=round((union_gt[5]-gt[5])/(res/scale_factor) ) # row
@@ -1665,16 +1745,9 @@ def main():
             gc.collect()
 
             fc,fr,trueID_intersect=MakeTrueID(intersection_points,imgg1_ui8_nd_gy,imgg2_ui8_nd_gy,gt,res,scale_factor)
-            if len(trueID_intersect)==2:
-                try:
-                    data_final,data_final2,height, width=clipImg(kernel,imgg1_ui8_nd_gy,imgg2_ui8_nd_gy,fr,fc)
-                    seamlinef=buildGraph(data_final,data_final2,height,width,path_method,trueID_intersect)
-                except:
-                    data_final,data_final2,height, width=clipImg(11,imgg1_ui8_nd_gy,imgg2_ui8_nd_gy,fr,fc)
-                    seamlinef=buildGraph(data_final,data_final2,height,width,path_method,trueID_intersect)
-            else:
-                print("please check the intersection of image: " +image1_ds+' and image: '+image2_ds)
-            del  data_final,data_final2,imgg1_ui8_nd_gy,imgg2_ui8_nd_gy
+            seamlinef=find_seamline(kernel,imgg1_ui8_nd_gy,imgg2_ui8_nd_gy,fr,fc,path_method,
+                                    trueID_intersect,image1_ds,image2_ds)
+            del  imgg1_ui8_nd_gy,imgg2_ui8_nd_gy
             print('Generating seamline ...')
             x=round((gt[2]-union_gt[2])/(res/scale_factor) ) # col
             y=round((union_gt[5]-gt[5])/(res/scale_factor) ) # row
@@ -1763,7 +1836,7 @@ def main():
             gc.collect()
             print('Saving "',image1_ds[:-4],'+',image2_ds[:-4],'"seamline ...')
             with rasterio.open(
-                str(image1_ds[:-4])+str(image2_ds[:-4])+'_sl.img',
+                str(image1_ds[:-4])+str(image2_ds[:-4])+'_seamline.img',
                 'w+',           
                 height=sf.shape[0],
                 width=sf.shape[1],

@@ -39,6 +39,7 @@ Outputs after Step 4:
   zero-based index of the Step 2 scene window being processed. The value
   identifies that window; it does not identify the candidate scene.
 - `*_raw.tif` copies of the pre-Step-4 mosaics for comparison
+- `fill_log.csv` — which candidate scene filled each cloud patch (see Step 4)
 
 ## Installation
 
@@ -135,7 +136,12 @@ step2/
 | `canvas_x_max` | Eastern bound of the mosaic canvas (map units) |
 | `canvas_y_min` | Southern bound of the mosaic canvas (map units) |
 
-Outputs: `mosaic_xs.tif` (XS mosaic), `mosaic_cloudmask.tif` (cloud mask mosaic), `ProcessOrder.txt`, `transform.npy`, `allWindow.npy`, `ImgInd.npy`, `Union_gt.npy`, per-pair seamline and blend-polygon rasters.
+Outputs: `mosaic_xs.tif` (XS mosaic), `mosaic_cloudmask.tif` (cloud mask mosaic), `ProcessOrder.txt`, `transform.npy`, `allWindow.npy`, `ImgInd.npy`, `Union_gt.npy`, and two rasters per seamline:
+
+- `<scene1><scene2>_seamline.img` for the first pair and `<scene>_seamline.img` for each later scene: the raw seamline path (uint8, `1` on the seamline, `0` elsewhere) on the Step 2 grid. For inspection only; later steps do not read it.
+- `<scene1><scene2>_seamline_polygon.img` and `<scene>_seamline_polygon.img`: the feathered blend weights (float32, Pan resolution) that Step 3 reuses.
+
+If no seamline can be found through valid pixels of an overlap (for example when snow, cloud or no-data splits it), Step 2 retries once with `kernel` 11 and then lets the seamline cross masked pixels at a high cost, printing a `WARNING`. Check that seamline in its `*_seamline.img`.
 
 ## Step 3 — Panchromatic mosaic
 
@@ -174,6 +180,8 @@ Two `para_cld.txt` settings control which candidates are used:
 Step 4 adds one to the numeric part of the candidate XS scene name to find its
 Pan counterpart. For example, `A0000001.img` uses
 `raw_pan/A0000002/A0000002_B1.DAT.raw` (SPOT layout) or `raw_pan/A0000002.tif`.
+
+Step 4 also writes `fill_log.csv`, one row per candidate tried for each cloud patch: `window` (index into `allWindow.npy`), `patch` (cloud-patch name, unique within a window), `candidate`, `ssim`, `clear_fraction`, `filled` (`yes`/`no`), `pixels` (patch size) and `note` (why a candidate was not used). A patch with no candidate above `ssim_threshold` gets one row with an empty `candidate`. The log does not affect the image outputs.
 
 Run with `run.bat` (or `python step4cloud_removal.py`). See `docs/TROUBLESHOOTING.md` for known failure modes and their fixes.
 

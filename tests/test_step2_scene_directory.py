@@ -51,8 +51,10 @@ def test_step2_reads_separate_scene_directory(step2, tmp_path, monkeypatch, scen
             step2.main()
         assert ast.literal_eval((work / "ProcessOrder.txt").read_text()) == names
         assert (work / "a0000003a0000001_seamline_polygon.img").exists()
+        assert (work / "a0000003a0000001_seamline.img").exists()   # raw seam path of the pair
         if scene_count == 3:
             assert (work / "a0000005_seamline_polygon.img").exists()
+            assert (work / "a0000005_seamline.img").exists()
         with rasterio.open(work / "mosaic_xs.tif") as mosaic:
             pixels = mosaic.read()
         with rasterio.open(work / "mosaic_cloudmask.tif") as mask:

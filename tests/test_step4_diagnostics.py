@@ -1,4 +1,5 @@
 """Step 4 reports unexpected candidate failures and keeps trying alternatives."""
+import csv
 import json
 import logging
 from types import SimpleNamespace
@@ -153,3 +154,53 @@ def test_main_closes_every_dataset_it_opens(step4, cloud_run, monkeypatch):
     step4.main()
     assert opened
     assert [dataset.name for dataset in opened if not dataset.closed] == []
+
+
+def fill_log(cloud_run):
+    with open(cloud_run.root / "fill_log.csv", newline="") as f:
+        return list(csv.DictReader(f))
+
+
+def test_fill_log_records_the_candidate_that_filled_each_patch(step4, cloud_run):
+    cloud_run.write("masks/A0000001.tif", np.ones((64, 64), np.uint8))
+    cloud_run.write("pan/A0000002.tif", cloud_run.mosaic[0])
+    step4.main()
+    rows = fill_log(cloud_run)
+    assert list(rows[0]) == step4.FILL_LOG_COLUMNS
+    assert len(rows) == 1
+    row = rows[0]
+    assert (row["window"], row["patch"], row["candidate"], row["filled"]) == \
+        ("0", "1_cld.img", "A0000001.img", "yes")
+    assert 0.75 <= float(row["ssim"]) <= 1.0          # passed ssim_threshold
+    assert float(row["clear_fraction"]) == 1.0
+    assert int(row["pixels"]) >= 100              # the 10 x 10 cloud, dilated
+
+
+def test_fill_log_lists_rejected_candidates_before_the_one_used(step4, cloud_run):
+    cloud_run.write("candidates/A0000003.img", cloud_run.mosaic)
+    cloud_run.write("candidates/A0000001.img", cloud_run.mosaic - 1)
+    cloud_run.write("masks/A0000001.tif", np.ones((64, 64), np.uint8))
+    cloud_run.write("pan/A0000002.tif", cloud_run.mosaic[0])
+    step4.main()
+    rows = fill_log(cloud_run)
+    assert [(r["candidate"], r["filled"]) for r in rows] == \
+        [("A0000003.img", "no"), ("A0000001.img", "yes")]
+    assert rows[0]["note"].startswith("error: FileNotFoundError")
+
+
+def test_fill_log_explains_a_too_cloudy_candidate(step4, cloud_run):
+    cloud_run.write("masks/A0000001.tif", np.full((64, 64), 20, np.uint8))
+    cloud_run.write("pan/A0000002.tif", cloud_run.mosaic[0])
+    step4.main()
+    (row,) = fill_log(cloud_run)
+    assert row["filled"] == "no" and float(row["clear_fraction"]) == 0.0
+    assert "cloud_tolerance" in row["note"]
+
+
+def test_fill_log_marks_patches_without_a_good_candidate(step4, cloud_run):
+    noise = np.random.default_rng(3).integers(1, 255, (4, 64, 64), dtype=np.uint8)
+    cloud_run.write("candidates/A0000001.img", noise)
+    step4.main()
+    (row,) = fill_log(cloud_run)
+    assert row["candidate"] == "" and row["filled"] == "no"
+    assert "ssim_threshold" in row["note"]

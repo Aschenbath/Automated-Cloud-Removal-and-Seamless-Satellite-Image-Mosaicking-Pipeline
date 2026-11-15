@@ -12,6 +12,7 @@ Known failure modes collected while running the pipeline operationally.
 
 **Symptom:** intersection points cannot be computed, or are wrong.
 **Cause:** pixels that should be `0` (outside the footprint) are not `0` — stray values along the scene border confuse the boundary polygonization.
+Step 2 then stops with `SeamlineNotFoundError: Expected 2 seamline endpoints ...`, naming both scenes.
 **Fix:** clean the scene borders before mosaicking; verify with the identify tool in QGIS/ArcMap that the area outside the footprint is exactly `0` in all bands.
 
 ## Step 2: `No road from target to endnode`
@@ -22,6 +23,8 @@ Case A — the shrunken overlap mask breaks into disconnected pieces (visible as
 
 1. Reduce `kernel` in `para.txt`, e.g. `61 → 5`.
 2. Enlarge the search tolerance in the code (`pix+30 → pix+500`).
+
+Since the masked-pixel fallback, Step 2 no longer stops here: if neither `kernel` nor `kernel` 11 gives a path, it prints `WARNING: no seamline through valid pixels` and lets the seamline cross masked or no-data pixels at a high cost (`networkx.NetworkXNoPath` used to end the run). Inspect that seamline in its `*_seamline.img`; if it crosses a large masked area, the remedies below still give a better seam.
 
 Case B — the overlap region between the two scenes is extremely thin (a sliver). Such pairs are error-prone and produce a visible dark line at the seam even when they succeed. **Recommendation:** don't mosaic pairs with such minimal overlap; choose scenes with healthier overlap instead.
 
