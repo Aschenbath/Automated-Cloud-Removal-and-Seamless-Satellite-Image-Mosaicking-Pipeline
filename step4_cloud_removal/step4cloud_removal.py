@@ -99,7 +99,7 @@ def image_dtype(true_bits):
 
 FILL_LOG_NAME = 'fill_log.csv'
 FILL_LOG_COLUMNS = ['window', 'patch', 'candidate', 'ssim', 'clear_fraction',
-                    'filled', 'pixels', 'note']
+                    'filled', 'pixels', 'note', 'x_min', 'y_min', 'x_max', 'y_max']
 
 def write_fill_log(rows, path=FILL_LOG_NAME):
     """Write the per-patch fill log (one row per candidate tried) as CSV.
@@ -109,8 +109,10 @@ def write_fill_log(rows, path=FILL_LOG_NAME):
     ``candidate`` (candidate scene, empty if none passed ``ssim_threshold``),
     ``ssim``, ``clear_fraction`` (clear share of the patch in the candidate's
     cloud mask, empty if not reached), ``filled`` (``yes``/``no``),
-    ``pixels`` (cloud-patch pixel count) and ``note`` (why a candidate was
-    not used). The log is for inspection only; nothing reads it back.
+    ``pixels`` (cloud-patch pixel count), ``note`` (why a candidate was
+    not used) and ``x_min``, ``y_min``, ``x_max``, ``y_max`` (bounds of the
+    patch window in the mosaic CRS, as in the patch raster). The log is for
+    inspection only; nothing reads it back.
     """
     with open(path, 'w', newline='') as f:
         writer = csv.DictWriter(f, fieldnames=FILL_LOG_COLUMNS)
@@ -375,6 +377,8 @@ def main():
 
                 TaicldWin=Window((cld_gt[2]-cloudmask_transform[2])/res,(cloudmask_transform[5]-cld_gt[5])/res, width=cld_ds.width ,height=cld_ds.height  )  #big cld mask
                 patch_pixels=int(np.count_nonzero(cld_ds.read(1)==1))
+                patch_bounds=dict(zip(('x_min', 'y_min', 'x_max', 'y_max'),
+                                      (round(float(v), 3) for v in cld_ds.bounds)))
 
 
                 ssimIndex=np.argsort(ssim[:,a])
@@ -384,7 +388,7 @@ def main():
                     fill_log.append({'window': i, 'patch': j, 'candidate': '',
                                      'ssim': round(float(ssim[ssimIndex[-1],a-1]),4) if len(file) else '',
                                      'clear_fraction': '', 'filled': 'no', 'pixels': patch_pixels,
-                                     'note': 'no candidate reaches ssim_threshold'})
+                                     'note': 'no candidate reaches ssim_threshold', **patch_bounds})
                 for s in list(range(1,np.count_nonzero(ssim[:,a-1]>=ssim_threshold)+1)):
                     if ss==0:
                         if ssim[ssimIndex[-s],a-1]>= ssim_threshold:#set threshold to filter not good enough img.
@@ -392,7 +396,8 @@ def main():
                             fName=file[ssimIndex[-s]]
                             log_row={'window': i, 'patch': j, 'candidate': fName,
                                      'ssim': round(float(ssim[ssimIndex[-s],a-1]),4),
-                                     'clear_fraction': '', 'filled': 'no', 'pixels': patch_pixels, 'note': ''}
+                                     'clear_fraction': '', 'filled': 'no', 'pixels': patch_pixels, 'note': '',
+                                     **patch_bounds}
 
                             with rasterio.open(candidate_img_path+os.sep+fName) as imagePool:
 
