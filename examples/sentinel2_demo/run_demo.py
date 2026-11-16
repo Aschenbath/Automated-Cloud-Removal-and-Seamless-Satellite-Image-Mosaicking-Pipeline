@@ -27,6 +27,7 @@ from rasterio.enums import Resampling
 from rasterio.features import geometry_mask
 from rasterio.transform import from_origin
 from rasterio.vrt import WarpedVRT
+from rasterio.windows import from_bounds
 from scipy.ndimage import binary_dilation
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
@@ -230,10 +231,49 @@ def copy_matching(src, dst, patterns):
             shutil.copy(f, dst)
 
 
+def check_results(s4):
+    """Summarise Step 4's results in *s4* (the Step 4 folder after a run).
+
+    Returns a dict with
+      ``fill_fraction``: share of the cloud pixels in ``mosaic_cloudmask_raw.tif``
+          (value 1) that are no longer marked as unfilled cloud in
+          ``mosaic_cloudmask.tif``;
+      ``zero_pixels``: pixels inside the mosaic footprint (every band non-zero
+          before Step 4) and inside the land/sea mask where ``mosaic_xs.tif``
+          has a 0 (no data) in some band after Step 4.
+    """
+    with rasterio.open(s4 / "mosaic_cloudmask_raw.tif") as src:
+        cloud_before = src.read(1) == 1
+    with rasterio.open(s4 / "mosaic_cloudmask.tif") as src:
+        cloud_after = src.read(1) == 1
+    with rasterio.open(s4 / "mosaic_xs_raw.tif") as src:
+        footprint = np.all(src.read() > 0, axis=0)
+    with rasterio.open(s4 / "mosaic_xs.tif") as src:
+        holes = np.any(src.read() == 0, axis=0)
+        bounds, shape = src.bounds, src.shape
+    # The land/sea mask may cover a larger area than the mosaic: read it on the
+    # mosaic's grid (outside the mask counts as sea).
+    with rasterio.open(s4 / "land_sea_mask.tif") as src:
+        window = from_bounds(*bounds, transform=src.transform)
+        land = src.read(1, window=window, out_shape=shape, boundless=True, fill_value=0) > 0
+    clouds = int(cloud_before.sum())
+    return {
+        "fill_fraction": 1 - float(cloud_after.sum()) / clouds if clouds else 1.0,
+        "zero_pixels": int((holes & footprint & land).sum()),
+    }
+
+
+# The demo fills roughly three quarters of the cloudy area; --check fails below this.
+MIN_FILL_FRACTION = 0.65
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--workdir", default="demo_output", type=pathlib.Path)
     parser.add_argument("--skip-download", action="store_true")
+    parser.add_argument("--check", action="store_true",
+                        help=f"exit with an error if less than {MIN_FILL_FRACTION:.0%}% of the cloudy area "
+                             "is filled or the final XS mosaic has no-data pixels inside the scenes on land")
     args = parser.parse_args()
     work = args.workdir.resolve()
     s2, s3, s4 = work / "step2", work / "step3", work / "step4"
@@ -260,6 +300,20 @@ def main():
     print(f"\nDone. Final products are in {s4}:")
     for f in ("mosaic_xs.tif", "mosaic_pan.tif", "mosaic_cloudmask.tif"):
         print("  ", s4 / f)
+
+    result = check_results(s4)
+    print(f"\nCloudy area filled: {result['fill_fraction']:.0%}; "
+          f"no-data pixels inside the scenes on land: {result['zero_pixels']}")
+    if args.check:
+        problems = []
+        if result["fill_fraction"] < MIN_FILL_FRACTION:
+            problems.append(f"filled {result['fill_fraction']:.0%} of the cloudy area, "
+                            f"expected at least {MIN_FILL_FRACTION:.0%}")
+        if result["zero_pixels"]:
+            problems.append(f"{result['zero_pixels']} no-data (0) pixels inside the scenes on land")
+        if problems:
+            sys.exit("Demo check failed: " + "; ".join(problems))
+        print("Demo check passed.")
 
 
 if __name__ == "__main__":

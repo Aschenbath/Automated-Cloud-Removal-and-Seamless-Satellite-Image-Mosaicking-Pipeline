@@ -54,5 +54,11 @@ roughly three quarters of the cloudy area. Patches touching the edge of the
 mosaic, and patches with no candidate above the SSIM threshold (0.75), are left
 unfilled by design.
 
+At the end the demo prints the share of the cloudy area that was filled and the
+number of no-data (0) pixels left inside the scenes on land. With `--check` it
+exits with an error if less than 65% of the cloudy area is filled or if any such
+no-data pixel is left; the monthly demo workflow runs it this way, so a
+regression fails CI instead of quietly lowering the fill rate.
+
 Run `python run_demo.py --skip-download --workdir demo_output` to rerun the
 pipeline on data downloaded earlier.
