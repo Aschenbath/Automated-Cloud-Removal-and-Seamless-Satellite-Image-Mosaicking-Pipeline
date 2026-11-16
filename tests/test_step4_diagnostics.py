@@ -174,6 +174,12 @@ def test_fill_log_records_the_candidate_that_filled_each_patch(step4, cloud_run)
     assert 0.75 <= float(row["ssim"]) <= 1.0          # passed ssim_threshold
     assert float(row["clear_fraction"]) == 1.0
     assert int(row["pixels"]) >= 100              # the 10 x 10 cloud, dilated
+    # The patch window in map coordinates (60 m grid from x=1000, y=10000)
+    # covers the cloud at rows/cols 20-30.
+    x_min, y_min, x_max, y_max = (float(row[c]) for c in ("x_min", "y_min", "x_max", "y_max"))
+    assert x_min <= 1000 + 20 * 60 and x_max >= 1000 + 30 * 60
+    assert y_max >= 10000 - 20 * 60 and y_min <= 10000 - 30 * 60
+    assert (x_max - x_min) % 60 == 0 and (y_max - y_min) % 60 == 0
 
 
 def test_fill_log_lists_rejected_candidates_before_the_one_used(step4, cloud_run):
@@ -204,3 +210,4 @@ def test_fill_log_marks_patches_without_a_good_candidate(step4, cloud_run):
     (row,) = fill_log(cloud_run)
     assert row["candidate"] == "" and row["filled"] == "no"
     assert "ssim_threshold" in row["note"]
+    assert float(row["x_min"]) < float(row["x_max"]) and float(row["y_min"]) < float(row["y_max"])

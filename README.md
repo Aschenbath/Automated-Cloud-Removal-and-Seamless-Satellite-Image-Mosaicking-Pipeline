@@ -181,7 +181,7 @@ Step 4 adds one to the numeric part of the candidate XS scene name to find its
 Pan counterpart. For example, `A0000001.img` uses
 `raw_pan/A0000002/A0000002_B1.DAT.raw` (SPOT layout) or `raw_pan/A0000002.tif`.
 
-Step 4 also writes `fill_log.csv`, one row per candidate tried for each cloud patch: `window` (index into `allWindow.npy`), `patch` (cloud-patch name, unique within a window), `candidate`, `ssim`, `clear_fraction`, `filled` (`yes`/`no`), `pixels` (patch size) and `note` (why a candidate was not used). A patch with no candidate above `ssim_threshold` gets one row with an empty `candidate`. The log does not affect the image outputs.
+Step 4 also writes `fill_log.csv`, one row per candidate tried for each cloud patch: `window` (index into `allWindow.npy`), `patch` (cloud-patch name, unique within a window), `candidate`, `ssim`, `clear_fraction`, `filled` (`yes`/`no`), `pixels` (patch size), `note` (why a candidate was not used) and `x_min`, `y_min`, `x_max`, `y_max` (the patch window's bounds in the mosaic CRS, so each row can be placed on the map). A patch with no candidate above `ssim_threshold` gets one row with an empty `candidate`. The log does not affect the image outputs.
 
 Run with `run.bat` (or `python step4cloud_removal.py`). See `docs/TROUBLESHOOTING.md` for known failure modes and their fixes.
 
