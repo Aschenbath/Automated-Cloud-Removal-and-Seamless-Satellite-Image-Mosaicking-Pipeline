@@ -21,8 +21,9 @@ jobs:
         run: pip install -r requirements.txt
       - name: Run demo
         # The work folder name contains a space on purpose: Steps 2-4 must
-        # accept paths with spaces (#6).
-        run: python examples/sentinel2_demo/run_demo.py --workdir "demo output"
+        # accept paths with spaces (#6). --check fails the run if the fill rate
+        # drops or no-data holes appear in the final mosaic (#21).
+        run: python examples/sentinel2_demo/run_demo.py --workdir "demo output" --check
       - name: Upload results
         uses: actions/upload-artifact@v4
         with:
