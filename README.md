@@ -195,6 +195,12 @@ python examples/sentinel2_demo/run_demo.py --workdir demo_output
 
 See [`examples/sentinel2_demo/README.md`](examples/sentinel2_demo/README.md) for details.
 
+### CloudPeel: explore the results in a browser
+
+CloudPeel is a small website that shows mosaics made with this pipeline before and after cloud filling, for several regions. Visitors can change Step 4's cloud tolerance and SSIM threshold and see the result change, with seamline, cloud-mask and fill-date layers. It is static: Step 4 is run ahead of time for a grid of settings. See [`examples/cloudpeel/README.md`](examples/cloudpeel/README.md) to run it locally or add a region.
+
+Live site: <https://buckai-observatory.org/Automated-Cloud-Removal-and-Seamless-Satellite-Image-Mosaicking-Pipeline/cloudpeel/>
+
 ## Testing
 
 Unit tests for the core seamline, blending and cloud-filling helpers run on any OS (no imagery, ERDAS or Windows tools needed):
@@ -221,7 +227,7 @@ step3_pan_mosaic/      Pan mosaic script, para_pan.txt template
 step4_cloud_removal/   cloud-filling script, para_cld.txt template
 docs/                  troubleshooting notes
 tests/                 unit tests (pytest)
-examples/              Sentinel-2 demo of Steps 2-4
+examples/              Sentinel-2 demo of Steps 2-4; CloudPeel web explorer
 paper.md               JOSS paper source
 ```
 

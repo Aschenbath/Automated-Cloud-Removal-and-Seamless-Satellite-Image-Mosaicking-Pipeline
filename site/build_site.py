@@ -7,6 +7,8 @@ This script copies them into site/_build/, with
     CONTRIBUTING.md under "Project";
   * links rewritten: links between site pages point to the site, and links to
     any other file of the repository point to that file on GitHub;
+  * a navbar link to the CloudPeel explorer, which the workflow copies into
+    cloudpeel/ after rendering (it is a static site of its own);
   * at the top of each page, a link back to the same file on GitHub (and, for
     a notebook, a link to open it in Colab);
   * a generated _quarto.yml, including the quartodoc configuration of the API
@@ -40,7 +42,8 @@ STEPS = {
     "step3_pan_mosaic/README.md": ("step3_pan_mosaic.md", "Step 3: Pan mosaic"),
     "step4_cloud_removal/README.md": ("step4_cloud_removal.md", "Step 4: cloud filling"),
 }
-DEMO = {"examples/sentinel2_demo/README.md": ("sentinel2_demo.md", "Sentinel-2 demo")}
+DEMO = {"examples/sentinel2_demo/README.md": ("sentinel2_demo.md", "Sentinel-2 demo"),
+        "examples/cloudpeel/README.md": ("cloudpeel_readme.md", "CloudPeel explorer (how it is made)")}
 PROJECT = {"CONTRIBUTING.md": "Contributing"}   # project files -> navbar names
 PAGES = {"README.md": "index.md"}
 for source, (target, _) in {**STEPS, **DEMO}.items():
@@ -186,6 +189,8 @@ website:
 {step_items}
       - href: api/index.qmd
         text: "API reference"
+      - href: {SITE_URL}cloudpeel/
+        text: "CloudPeel explorer"
       - text: "Project"
         menu:
 {project_items}

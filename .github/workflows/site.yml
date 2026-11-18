@@ -2,8 +2,10 @@ name: Documentation website
 
 # Renders README.md, the step and demo READMEs, docs/*.md, CONTRIBUTING.md
 # and the API reference (quartodoc, read statically from the docstrings of
-# the step scripts) with Quarto (site/build_site.py). Pull requests build
-# the site to check it; pushes to main also deploy it to GitHub Pages.
+# the step scripts) with Quarto (site/build_site.py), and adds the CloudPeel
+# explorer (examples/cloudpeel/site, with its images from a release) under
+# cloudpeel/. Pull requests build the site to check it; pushes to main also
+# deploy it to GitHub Pages.
 on:
   push:
     branches: [main]
@@ -13,6 +15,8 @@ on:
       - 'step2_mosaic/*.py'
       - 'step3_pan_mosaic/*.py'
       - 'step4_cloud_removal/*.py'
+      - 'examples/cloudpeel/site/**'
+      - 'examples/cloudpeel/fetch_data.py'
       - '.github/workflows/site.yml'
   pull_request:
     paths:
@@ -21,6 +25,8 @@ on:
       - 'step2_mosaic/*.py'
       - 'step3_pan_mosaic/*.py'
       - 'step4_cloud_removal/*.py'
+      - 'examples/cloudpeel/site/**'
+      - 'examples/cloudpeel/fetch_data.py'
       - '.github/workflows/site.yml'
   workflow_dispatch:
 
@@ -58,6 +64,20 @@ jobs:
         run: python -m quartodoc build --verbose
       - name: Render
         run: quarto render site/_build
+      - name: Add CloudPeel
+        # The images are a release asset (see examples/cloudpeel/fetch_data.py),
+        # not part of git. A pull request without the release still builds the
+        # documentation; a push to main needs it.
+        run: |
+          if python3 examples/cloudpeel/fetch_data.py; then
+            cp -R examples/cloudpeel/site site/_build/_site/cloudpeel
+            du -sh site/_build/_site/cloudpeel
+          elif [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "::warning::CloudPeel images not found in the release; CloudPeel is left out of this build."
+          else
+            echo "::error::CloudPeel images not found in the release."
+            exit 1
+          fi
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site/_build/_site

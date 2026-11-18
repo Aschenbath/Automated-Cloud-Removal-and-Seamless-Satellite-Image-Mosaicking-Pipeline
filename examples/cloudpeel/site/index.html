@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Unlisted preview: keep search engines out. Remove this line at the public launch. -->
+<title>CloudPeel: Cloud-Free Explorer</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Cpath fill=%22%230a7bbb%22 d=%22M9 25h15a6 6 0 0 0 .7-12A8 8 0 0 0 9.4 12 6.5 6.5 0 0 0 9 25z%22/%3E%3C/svg%3E">
+<link rel="stylesheet" href="vendor/leaflet.min.css">
+<link rel="stylesheet" href="style.css?v=fd6afe2b">
+</head>
+<body>
+<main>
+  <aside id="panel">
+    <header>
+      <div class="title-row"><h1>CloudPeel</h1>
+        <div class="lang" role="group" data-i18n-aria="lang.label" aria-label="Language">
+          <button type="button" data-lang="en">EN</button><button type="button" data-lang="zh">中文</button><button type="button" data-lang="nl">NL</button>
+        </div></div>
+      <p class="tagline" data-i18n="app.tagline">Cloud-free satellite mosaic explorer</p>
+      <p class="lede" data-i18n-html="app.lede"></p>
+      <div class="header-actions">
+        <button type="button" id="tour-start" class="pill primary" data-i18n="btn.tour">▶ How it works</button>
+        <button type="button" id="copy-link" class="pill" data-i18n="btn.copyLink">Copy link to this view</button>
+      </div>
+    </header>
+
+    <section>
+      <h2 data-i18n="h.region">Region</h2>
+      <div class="presets regions" id="regions"></div>
+      <div class="dates" id="dates"></div>
+    </section>
+
+    <section id="pool-section" hidden>
+      <h2 data-i18n="h.pool">Fill from</h2>
+      <div class="presets regions" id="pools"></div>
+      <small class="hint" id="pool-note"></small>
+    </section>
+
+    <section>
+      <h2 data-i18n="h.presets">Presets</h2>
+      <div class="presets" id="presets"></div>
+    </section>
+
+    <section>
+      <h2 data-i18n="h.settings">Settings</h2>
+      <label class="slider">
+        <span class="label-row"><span data-i18n="set.tol">Cloud tolerance</span><output id="tol-out"></output></span>
+        <input type="range" id="tol" min="0" step="1">
+        <small data-i18n="set.tolHelp">How cloudy a fill candidate may itself be over a patch. Higher fills more patches, but may copy some haze back in.</small>
+        <small class="note" id="tol-note" data-i18n="set.tolNote" hidden>In this region the fill candidates are almost cloud-free over every patch, so this setting doesn't change the result. Similarity is what matters here.</small>
+      </label>
+      <label class="slider">
+        <span class="label-row"><span data-i18n="set.ssim">Similarity threshold (SSIM)</span><output id="ssim-out"></output></span>
+        <input type="range" id="ssim" min="0" step="1">
+        <small data-i18n="set.ssimHelp">How closely a candidate must match the clear area around a patch. Lower fills more patches, but seams may show.</small>
+      </label>
+    </section>
+
+    <section>
+      <h2 data-i18n="h.result">Result</h2>
+      <dl class="stats">
+        <div><dt data-i18n="stat.patches">Cloud patches filled</dt><dd id="st-patches"></dd></div>
+        <div><dt data-i18n="stat.area">Cloudy area filled</dt><dd id="st-area"></dd></div>
+        <div><dt data-i18n="stat.left">Cloud left</dt><dd id="st-left"></dd></div>
+        <div><dt data-i18n="stat.copied">Cloud copied in</dt><dd id="st-flag"></dd></div>
+      </dl>
+      <small class="hint" id="st-hint"></small>
+    </section>
+
+    <section>
+      <h2 data-i18n="h.grid">Cloudy area filled, every setting</h2>
+      <div id="grid" class="grid" role="grid" data-i18n-aria="grid.aria" aria-label="Percentage of cloudy area filled for each setting"></div>
+      <p class="axis-note" data-i18n-html="grid.note"></p>
+    </section>
+
+    <section>
+      <h2 data-i18n="h.layers">Layers</h2>
+      <label class="check" id="seams-row" hidden><input type="checkbox" id="show-seams" checked> <span data-i18n="layer.seams">Seamlines</span>
+        <span class="swatch-line"></span></label>
+      <small class="hint" id="seams-note" data-i18n="layer.seamsNote"></small>
+      <label class="check" id="sources-row" hidden><input type="checkbox" id="show-sources"> <span data-i18n="layer.sources">Which date filled each patch</span></label>
+      <small class="hint" id="sources-note" hidden></small>
+      <ul class="legend" id="sources-legend" hidden></ul>
+      <label class="check" id="naive-row" hidden><input type="checkbox" id="show-naive"> <span data-i18n="layer.naive">Compare: paste without blending</span></label>
+      <small class="hint" id="naive-note" hidden></small>
+      <button type="button" class="pill small" id="naive-example" hidden data-i18n="btn.naiveExample">Show the clearest example</button>
+      <label class="check"><input type="checkbox" id="show-mask"> <span data-i18n="layer.mask">Cloud mask overlay</span></label>
+      <ul class="legend" id="legend" hidden>
+        <li><i style="background:rgba(0,220,255,.75)"></i><span data-i18n="legend.filled">Filled</span></li>
+        <li><i style="background:rgba(255,40,40,.8)"></i><span data-i18n="legend.unfilled">Left unfilled</span></li>
+        <li><i style="background:rgba(255,180,0,.8)"></i><span data-i18n="legend.flagged">Flagged by the candidate's cloud mask</span></li>
+      </ul>
+    </section>
+
+    <section class="suggest">
+      <h2 data-i18n="h.suggest">Suggest a place</h2>
+      <p class="hint" style="margin-top:0" data-i18n="suggest.intro"></p>
+      <form id="suggest-form" novalidate>
+        <label><span data-i18n="suggest.name">Place name</span>
+          <input type="text" id="sg-name" maxlength="80" data-i18n-ph="suggest.namePh" required></label>
+        <div class="row">
+          <label><span data-i18n="suggest.lat">Latitude</span> <input type="number" id="sg-lat" step="0.0001" min="-80" max="84" required></label>
+          <label><span data-i18n="suggest.lon">Longitude</span> <input type="number" id="sg-lon" step="0.0001" min="-180" max="180" required></label>
+        </div>
+        <button type="button" id="sg-pick" class="ghost" data-i18n="suggest.pick">Pick on map</button>
+        <label><span data-i18n="suggest.season">Season (optional)</span>
+          <select id="sg-season">
+            <option value="" data-i18n="season.any">Any</option><option value="Spring" data-i18n="season.Spring">Spring</option><option value="Summer" data-i18n="season.Summer">Summer</option>
+            <option value="Autumn" data-i18n="season.Autumn">Autumn</option><option value="Winter" data-i18n="season.Winter">Winter</option>
+          </select></label>
+        <label><span data-i18n="suggest.why">Why this place? (optional)</span>
+          <textarea id="sg-note" rows="2" maxlength="500"></textarea></label>
+        <p class="hint" id="sg-error" role="alert" hidden></p>
+        <button type="submit" id="sg-submit" data-i18n="suggest.submit">Send suggestion via GitHub</button>
+        <small class="hint" data-i18n="suggest.hint"></small>
+      </form>
+    </section>
+
+    <section class="credits">
+      <h2 data-i18n="h.madeBy">Made by</h2>
+      <p class="people" data-i18n="credits.people">Hsiao-Jou (Amy) Hsu and Joachim Moortgat · The Ohio State University</p>
+      <div class="logos">
+        <a href="https://buckai-observatory.org/" title="BuckAI Observatory">
+          <img src="img/buckai_observatory_logo.png" alt="BuckAI Observatory" width="72" height="72"></a>
+
+      </div>
+      <a href="https://www.csrsr.ncu.edu.tw/" class="logo-plate"
+         title="Center for Space and Remote Sensing Research, National Central University">
+        <img src="img/csrsr_logo.png" alt="Center for Space and Remote Sensing Research (CSRSR), National Central University" width="300" height="43"></a>
+      <div class="qr-card">
+        <div id="qr" aria-hidden="true"></div>
+        <p><span data-i18n="qr.visit">Visit Amy's website</span><br><a href="https://amy-hsu.github.io/#guestbook">amy-hsu.github.io</a>
+          <br><small data-i18n="qr.guestbook">and sign the guestbook</small></p>
+      </div>
+    </section>
+
+    <section class="cite">
+      <h2 data-i18n="h.cite">Cite</h2>
+      <p>Hsu, H.-J., Tseng, K.-H., Tsai, F., Liu, C.-L., Lo, C.-C., &amp; Moortgat, J. (2026).
+        A novel approach to automated cloud removal and seamless multisensor satellite image mosaicking.
+        <i>Applied Computing and Geosciences</i>, 31, 100387.
+        <a href="https://doi.org/10.1016/j.acags.2026.100387">doi:10.1016/j.acags.2026.100387</a></p>
+      <p><span data-i18n="cite.software">Software</span>: <a href="https://doi.org/10.5281/zenodo.23404699">doi:10.5281/zenodo.23404699</a> ·
+        <a href="https://github.com/buckai-observatory/Automated-Cloud-Removal-and-Seamless-Satellite-Image-Mosaicking-Pipeline">GitHub</a></p>
+      <button type="button" id="copy-cite" data-i18n="cite.copy">Copy citation</button>
+    </section>
+
+    <footer>
+      <p data-i18n="footer"></p>
+    </footer>
+  </aside>
+
+  <div id="map-wrap">
+    <div id="map"></div>
+    <div id="divider" role="slider" tabindex="0" data-i18n-aria="divider.aria" aria-label="Before and after divider"
+         aria-valuemin="0" aria-valuemax="100" aria-valuenow="50"><span>⇔</span></div>
+    <div class="tag tag-left" id="tag-before">Before</div>
+    <div class="tag tag-right" id="tag-after">After</div>
+    <div class="embed-bar" id="embed-bar" hidden>
+      <strong>CloudPeel</strong>
+      <select id="embed-region" data-i18n-aria="h.region" aria-label="Region"></select>
+      <select id="embed-lang" data-i18n-aria="lang.label" aria-label="Language"><option value="en">EN</option><option value="zh">中文</option><option value="nl">NL</option></select>
+      <a id="embed-open" target="_blank" rel="noopener" data-i18n="embed.open">Open full site ↗</a>
+    </div>
+    <div class="tour" id="tour" hidden role="dialog" data-i18n-aria="tour.aria" aria-label="How it works">
+      <p class="tour-step" id="tour-step"></p>
+      <h3 id="tour-title"></h3>
+      <p id="tour-text"></p>
+      <ul class="legend" id="tour-legend"></ul>
+      <div class="tour-nav">
+        <button type="button" id="tour-prev" class="pill" data-i18n="tour.back">Back</button>
+        <button type="button" id="tour-next" class="pill primary">Next</button>
+        <button type="button" id="tour-close" class="pill" data-i18n-aria="tour.close" aria-label="Close">✕</button>
+      </div>
+    </div>
+    <div class="tag tag-offline" id="offline-tag" data-i18n="offline" hidden></div>
+  </div>
+</main>
+<script src="vendor/leaflet.min.js"></script>
+<script src="vendor/qrcode.min.js"></script>
+<script src="i18n.js?v=e4ad5b25"></script>
+<script src="app.js?v=0972847e"></script>
+</body>
+</html>
