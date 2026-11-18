@@ -37,3 +37,9 @@ dependencies = {file = ["requirements.txt"]}
 
 [tool.setuptools_scm]
 fallback_version = "0.0.0"
+# Only release tags (v1.2.3) are versions; other tags, such as the CloudPeel
+# data release (cloudpeel-data-v1), are ignored.
+tag_regex = '^v(?P<version>\d+(?:\.\d+)*)$'
+
+[tool.setuptools_scm.scm.git]
+describe_command = ["git", "describe", "--dirty", "--tags", "--long", "--match", "v[0-9]*"]

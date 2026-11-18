@@ -220,8 +220,10 @@ once (no path), so keep a region's dates within one season.
 The documentation website's workflow (`.github/workflows/site.yml`) also
 publishes CloudPeel at `cloudpeel/` on the same site: it copies `site/`,
 downloads the release's images into `cloudpeel/data/`, and deploys both with the
-documentation. To publish new or changed regions, upload a new image archive as
-described in `fetch_data.py` and change its `TAG`.
+documentation. To publish new or changed regions, add a new image archive to the
+existing release as described in `fetch_data.py` and change its `ASSET`. Do not
+create a new release for it: every published release of this repository is
+archived on Zenodo as a new software version.
 
 ## Layout
 

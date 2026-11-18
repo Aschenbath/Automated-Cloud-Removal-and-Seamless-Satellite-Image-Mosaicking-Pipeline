@@ -7,12 +7,14 @@ stays small. They are attached to a GitHub release of this repository instead:
     python fetch_data.py --force    # replace an existing site/data/
 
 Only the Python standard library is needed. To publish a new image set, zip
-site/data/ so that the archive holds data/datasets.json, data/<region>/...:
+site/data/ so that the archive holds data/datasets.json, data/<region>/...,
+under a new file name, and add it to the existing release:
 
-    cd site && zip -r -X ../cloudpeel-data.zip data
-    gh release create cloudpeel-data-vN cloudpeel-data.zip --title "CloudPeel data vN"
+    cd site && zip -r -X -0 ../cloudpeel-data-v2.zip data
+    gh release upload cloudpeel-data-v1 ../cloudpeel-data-v2.zip
 
-and change TAG below.
+then change ASSET below. Do not create a new release for it: every published
+release of this repository is archived on Zenodo as a new software version.
 """
 import argparse
 import pathlib
