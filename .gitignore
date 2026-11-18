@@ -42,3 +42,7 @@ site/_build/
 build/
 dist/
 *.egg-info/
+# CloudPeel: images from fetch_data.py, region working folders, demo video
+examples/cloudpeel/site/data/
+examples/cloudpeel/work/
+examples/cloudpeel/media/
