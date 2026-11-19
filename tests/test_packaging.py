@@ -105,7 +105,7 @@ def test_leftover_egg_info_is_not_taken_for_an_install(tmp_path):
     by_metadata = ("import importlib.metadata as m; "
                    "print(m.distribution('cloud-removal-mosaicking').version)")
     result = subprocess.run([sys.executable, "-S", "-c", by_metadata], capture_output=True,
-                            text=True, env=env, check=True)
+                            text=True, env=env, cwd=tmp_path, check=True)
     assert result.stdout.strip() == "0.0.0"  # metadata alone is fooled by the egg-info
     assert not _installed(["-S"], env)
 
