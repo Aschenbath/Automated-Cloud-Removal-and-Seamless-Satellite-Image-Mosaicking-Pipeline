@@ -23,6 +23,13 @@ from scipy.ndimage import gaussian_filter
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
+# Keep the complete pipeline free of the deprecations reported in issue #48.
+pytestmark = [
+    pytest.mark.filterwarnings("error::PendingDeprecationWarning"),
+    pytest.mark.filterwarnings("error:The inplace keyword"),
+    pytest.mark.filterwarnings("error:.*keep_geom_type"),
+]
+
 # A 6 km x 6 km area: 300 x 300 XS pixels at 20 m, 600 x 600 Pan pixels at 10 m.
 AOI = (200000, 2500000, 206000, 2506000)
 PRIMARY = [

@@ -302,7 +302,7 @@ def main():
 
 
             cv2.rectangle(dilation, (x-expdx, y-expdy), (x + w + expdw, y + h + expdh), (255,0, 0), 3)
-            cld_gt=A.translation( cdc+(x-expdx)*res , cdr-(y-expdy)*res ) * A.scale(res, -res)
+            cld_gt=A.translation( cdc+(x-expdx)*res , cdr-(y-expdy)*res ) @ A.scale(res, -res)
             write_window = Window( cld_gt[2] , cld_gt[5]   ,  patch_w, patch_h )
 
             clas=[np.sum(labels[y-expdy:y+h+expdh,x-expdx:x+w+expdw]==a) for a in range(num_objects)]

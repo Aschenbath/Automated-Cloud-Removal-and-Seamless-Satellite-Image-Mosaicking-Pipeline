@@ -52,8 +52,11 @@ def test_integer_costs_have_signed_differences_and_the_original_zero_penalty(gra
 ])
 def test_legacy_uint8_costs_remain_reproducible(graph_run, method, left, right, expected):
     image = np.array([[left, right], [left, right]], np.uint8)
-    graph, _, _ = graph_run(image, image.copy(), method)
+    errors_before = np.geterr().copy()
+    graph, _, caught = graph_run(image, image.copy(), method)
     assert graph.edges[1, 2]["weight"] == pytest.approx(expected, rel=1e-14)
+    assert not [item for item in caught if "overflow" in str(item.message)]
+    assert np.geterr() == errors_before
 
 
 @pytest.mark.parametrize("method", ["a6c_int", "a7c_int"])

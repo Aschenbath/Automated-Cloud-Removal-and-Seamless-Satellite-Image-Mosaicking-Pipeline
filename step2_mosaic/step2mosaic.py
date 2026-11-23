@@ -194,7 +194,7 @@ def find_raster_intersect(raster1,raster2,res,scale_factor):
     gc.collect()
     col1=round(col1*scale_factor)
     row1=round(row1*scale_factor)
-    gt = A.translation(max(r1[0], r2[0]), min(r1[1], r2[1])) *  A.scale(res, -res) * image1_ds.transform.scale(
+    gt = A.translation(max(r1[0], r2[0]), min(r1[1], r2[1])) @  A.scale(res, -res) @ image1_ds.transform.scale(
         (image1_ds.width / image1_ds.width),#image1_d.shape[-1]),
         (image1_ds.height / image1_ds.height)# image1_d.shape[-2])
     )   
@@ -257,7 +257,7 @@ def find_raster_intersect(raster1,raster2,res,scale_factor):
         geom2 =shapefile2.geometry[0]
         
         
-    res_union =gpd.overlay(shapefile1, shapefile2, how='union')
+    res_union =gpd.overlay(shapefile1, shapefile2, how='union', keep_geom_type=True)
     res_union['new_column'] = 0
     res_union_new = res_union.dissolve(by='new_column')
      
@@ -273,7 +273,7 @@ def find_raster_intersect(raster1,raster2,res,scale_factor):
  
     if len(intersection_points)>2:        
               
-        res_diff=gpd.overlay(shapefile2, shapefile1,  how='difference')
+        res_diff=gpd.overlay(shapefile2, shapefile1,  how='difference', keep_geom_type=True)
        
         res_diff_sep = res_diff['geometry'].values[0]
 
@@ -305,22 +305,22 @@ def find_raster_intersect(raster1,raster2,res,scale_factor):
             deval = res_diff.columns.str.contains('DN_')
             if any(deval):
                 res_diff.loc[:,deval ]
-                res_diff.drop(res_union_new.loc[:,deval ],inplace=True,axis=1)
+                res_diff = res_diff.drop(res_union_new.loc[:,deval ],axis=1)
             
-            res_union2 =gpd.overlay(res_diff, fin, how='difference')
+            res_union2 =gpd.overlay(res_diff, fin, how='difference', keep_geom_type=True)
            
-            res_union_new=gpd.overlay(res_union_new, res_union2, how='difference') 
+            res_union_new=gpd.overlay(res_union_new, res_union2, how='difference', keep_geom_type=True)
             deval = res_union_new.columns.str.contains('DN_')
             if any(deval):
                 res_union_new.loc[:,deval ]
-                res_union_new.drop(res_union_new.loc[:,deval ],inplace=True,axis=1)
+                res_union_new = res_union_new.drop(res_union_new.loc[:,deval ],axis=1)
             
             
     
     del shapefile1,shapefile2,geom1,geom2,points,res_union
     union_it = [min(r1[0], r2[0]), max(r1[1], r2[1]), max(r1[2], r2[2]), min(r1[3], r2[3])]#boundbox for union_m
     union_m=np.zeros(( int((max(r1[1], r2[1])-min(r1[3], r2[3]))/res)  ,  int((max(r1[2], r2[2])-min(r1[0], r2[0]))/res)   ))
-    union_gt = A.translation(min(r1[0], r2[0]), max(r1[1], r2[1])) *  A.scale(res, -res) 
+    union_gt = A.translation(min(r1[0], r2[0]), max(r1[1], r2[1])) @  A.scale(res, -res)
    
     xypos1=( int( (gt1[2]-union_it[0]) /(res ))  , int( (union_it[1]-gt1[5])/ (res )    )  )
     xypos2=( int( (gt2[2]-union_it[0]) /(res ))  , int( (union_it[1]-gt2[5])/(res )     )  )
@@ -869,26 +869,28 @@ def buildGraph(data_final,data_final2,height,width,path_method,trueID_intersect,
              }    
     
     
-    for x in tqdm.tqdm(range(1,width*height+1)):# 
+    # Legacy uint8 costs intentionally wrap; keep the arithmetic unchanged.
+    with np.errstate(over='ignore'):
+        for x in tqdm.tqdm(range(1,width*height+1)):#
     
-        conf1=new_d[x-1].tolist()
-        conf2=new_d2[x-1].tolist()
+            conf1=new_d[x-1].tolist()
+            conf2=new_d2[x-1].tolist()
         
-        if x%width!=0 and x<(height-1)*width and conf1 !=0 and conf2 !=0 :
-            right=x+1
-            G.add_edge(x, right,  weight = eval(algos_r[path_method])   )
-            down=x+width        
-            G.add_edge(x, down,  weight = eval(algos_d[path_method])   )
+            if x%width!=0 and x<(height-1)*width and conf1 !=0 and conf2 !=0 :
+                right=x+1
+                G.add_edge(x, right,  weight = eval(algos_r[path_method])   )
+                down=x+width
+                G.add_edge(x, down,  weight = eval(algos_d[path_method])   )
 
                        
-        elif x%width==0 and x!=width*height and conf1 !=0 and conf2 !=0 :
-            down=x+width         
+            elif x%width==0 and x!=width*height and conf1 !=0 and conf2 !=0 :
+                down=x+width
            
-            G.add_edge(x, down,  weight =eval(algos_d[path_method])   )
+                G.add_edge(x, down,  weight =eval(algos_d[path_method])   )
             
-        elif x>(height-1)*width and  x!=width*height and conf1 !=0 and conf2 !=0: 
-            right=x+1          
-            G.add_edge(x, right,  weight =  eval(algos_r[path_method])   )
+            elif x>(height-1)*width and  x!=width*height and conf1 !=0 and conf2 !=0:
+                right=x+1
+                G.add_edge(x, right,  weight =  eval(algos_r[path_method])   )
             
             
     source=trueID_intersect[0]
@@ -1038,7 +1040,7 @@ def find_raster_intersect_for_mosaic(raster1,raster2,mosaic_gt,res,scale_factor,
     
     array2 = scipy.ndimage.zoom(np.dstack((image2_ds.read(3,window=window),image2_ds.read(2,window=window),image2_ds.read(1,window=window))),(scale_factor,scale_factor,1), order=1, )#
 
-    gt = A.translation(r1[0], r1[1]) *  A.scale(res, -res) * image1_ds.transform.scale(
+    gt = A.translation(r1[0], r1[1]) @  A.scale(res, -res) @ image1_ds.transform.scale(
         (image1_ds.width / image1_ds.width ), 
         (image1_ds.height / image1_ds.height ) 
     )  
@@ -1092,7 +1094,7 @@ def find_raster_intersect_for_mosaic(raster1,raster2,mosaic_gt,res,scale_factor,
         
     if len(intersection_points)>2:        
        
-        res_diff=gpd.overlay(shapefile1, res_union_new, how='difference')
+        res_diff=gpd.overlay(shapefile1, res_union_new, how='difference', keep_geom_type=True)
 
        
         res_diff_sep = res_diff['geometry'].values[0]
@@ -1121,14 +1123,14 @@ def find_raster_intersect_for_mosaic(raster1,raster2,mosaic_gt,res,scale_factor,
         
         
         if len(res_diff_sep_gdf)>1:
-            res_union =gpd.overlay(shapefile1, res_union_new, how='union')
+            res_union =gpd.overlay(shapefile1, res_union_new, how='union', keep_geom_type=True)
             res_union['new_column'] = 0
             res_union_new = res_union.dissolve(by='new_column')
            
             deval = res_union_new.columns.str.contains('DN_')
             if any(deval):
                 res_union_new.loc[:,deval ]
-                res_union_new.drop(res_union_new.loc[:,deval ],inplace=True,axis=1)
+                res_union_new = res_union_new.drop(res_union_new.loc[:,deval ],axis=1)
            
             del deval 
             
@@ -1136,25 +1138,25 @@ def find_raster_intersect_for_mosaic(raster1,raster2,mosaic_gt,res,scale_factor,
             deval = res_diff.columns.str.contains('DN_')
             if any(deval):
                 res_diff.loc[:,deval ]
-                res_diff.drop(res_union_new.loc[:,deval ],inplace=True,axis=1)
+                res_diff = res_diff.drop(res_union_new.loc[:,deval ],axis=1)
             
-            res_union2 =gpd.overlay(res_diff, fin, how='difference')
+            res_union2 =gpd.overlay(res_diff, fin, how='difference', keep_geom_type=True)
          
-            res_union_new=gpd.overlay(res_union_new, res_union2, how='difference') 
+            res_union_new=gpd.overlay(res_union_new, res_union2, how='difference', keep_geom_type=True)
             deval = res_union_new.columns.str.contains('DN_')
             if any(deval):
                 res_union_new.loc[:,deval ]
-                res_union_new.drop(res_union_new.loc[:,deval ],inplace=True,axis=1)
+                res_union_new = res_union_new.drop(res_union_new.loc[:,deval ],axis=1)
                 
         else:
-            res_union =gpd.overlay(shapefile1, res_union_new, how='union')
+            res_union =gpd.overlay(shapefile1, res_union_new, how='union', keep_geom_type=True)
             res_union['new_column'] = 0
             res_union_new = res_union.dissolve(by='new_column')
       
             deval = res_union_new.columns.str.contains('DN_')
             if any(deval):
                 res_union_new.loc[:,deval ]
-                res_union_new.drop(res_union_new.loc[:,deval ],inplace=True,axis=1)
+                res_union_new = res_union_new.drop(res_union_new.loc[:,deval ],axis=1)
            
             del deval 
             
@@ -1164,14 +1166,14 @@ def find_raster_intersect_for_mosaic(raster1,raster2,mosaic_gt,res,scale_factor,
         gc.collect()
     #-----------------------     
     else:
-        res_union =gpd.overlay(shapefile1, res_union_new, how='union')
+        res_union =gpd.overlay(shapefile1, res_union_new, how='union', keep_geom_type=True)
         res_union['new_column'] = 0
         res_union_new = res_union.dissolve(by='new_column')
       
         deval = res_union_new.columns.str.contains('DN_')
         if any(deval):
             res_union_new.loc[:,deval ]
-            res_union_new.drop(res_union_new.loc[:,deval ],inplace=True,axis=1)
+            res_union_new = res_union_new.drop(res_union_new.loc[:,deval ],axis=1)
        
         del deval 
   
@@ -1187,7 +1189,7 @@ def find_raster_intersect_for_mosaic(raster1,raster2,mosaic_gt,res,scale_factor,
 
     del u_con,xypos1#,
     gc.collect()
-    union_gt = A.translation(r1[0], r1[1]) *  A.scale(res, -res)      
+    union_gt = A.translation(r1[0], r1[1]) @  A.scale(res, -res)
     uni_conn=np.array(uni_con)
     del uni_con
     gc.collect()
@@ -1531,7 +1533,7 @@ def main():
                 count=1,
                 dtype=rasterio.float32,          
                 crs= canvas_crs,#   
-                transform= A.translation(union_gt[2], union_gt[5]) * A.scale(pan_res, -pan_res) #  
+                transform= A.translation(union_gt[2], union_gt[5]) @ A.scale(pan_res, -pan_res) #
             ) as dst:
                 dst.write(cv2.resize(mask_blurred_4chan,(mask_blurred_4chan.shape[1]*int(res/pan_res) ,mask_blurred_4chan.shape[0]*int(res/pan_res)),interpolation=cv2.INTER_NEAREST).astype(rasterio.float32), 1)        
 
@@ -1688,8 +1690,8 @@ def main():
             with open("ProcessOrder.txt", "w") as order_file:
                 order_file.write(str(ReadOrder))
             Union_gt.append(union_gt)    
-            mosaic_gt = A.translation(float(min( gt_two)), float(max( gt_five))) *  A.scale(res, -res) 
-            cloudmask_gt = A.translation(float(min( gt_two)), float(max( gt_five))) *  A.scale(res, -res) 
+            mosaic_gt = A.translation(float(min( gt_two)), float(max( gt_five))) @  A.scale(res, -res)
+            cloudmask_gt = A.translation(float(min( gt_two)), float(max( gt_five))) @  A.scale(res, -res)
 
             mosaic_out= rasterio.open(
                 'mosaic_xs.tif',
@@ -1859,7 +1861,7 @@ def main():
                 count=1,
                 dtype=rasterio.float32,          
                 crs= canvas_crs,#Initialize from a named CRS            
-                transform= A.translation(union_gt[2], union_gt[5]) * A.scale(pan_res, -pan_res) #  union_gt,
+                transform= A.translation(union_gt[2], union_gt[5]) @ A.scale(pan_res, -pan_res) #  union_gt,
             ) as dst:
                 dst.write(cv2.resize(mask_blurred_4chan,(mask_blurred_4chan.shape[1]*int(res/pan_res) ,mask_blurred_4chan.shape[0]*int(res/pan_res)),interpolation=cv2.INTER_NEAREST).astype(rasterio.float32), 1)        
 

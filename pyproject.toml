@@ -1,12 +1,13 @@
 [build-system]
-requires = ["setuptools>=64", "setuptools_scm>=8"]
+requires = ["setuptools>=77.0.3", "setuptools_scm>=8"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "cloud-removal-mosaicking"
 description = "Automated cloud removal and seamless satellite image mosaicking pipeline (Steps 2-4)"
 readme = "README.md"
-license = {file = "LICENSE"}
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [{name = "Hsiao-Jou Hsu"}]
 requires-python = ">=3.10"
 dynamic = ["version", "dependencies"]
