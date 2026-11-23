@@ -7,10 +7,16 @@
 [![Paper](https://img.shields.io/badge/Paper-10.1016%2Fj.acags.2026.100387-0A7BBB.svg?style=flat-square)](https://doi.org/10.1016/j.acags.2026.100387)
 [![Software DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23404699.svg)](https://doi.org/10.5281/zenodo.23404699)
 [![Documentation website](https://img.shields.io/badge/documentation-website-0A7BBB.svg?style=flat-square)](https://buckai-observatory.org/Automated-Cloud-Removal-and-Seamless-Satellite-Image-Mosaicking-Pipeline/)
+[![Try it: CloudPeel](https://img.shields.io/badge/try%20it-CloudPeel-2E8B57.svg?style=flat-square)](https://buckai-observatory.org/Automated-Cloud-Removal-and-Seamless-Satellite-Image-Mosaicking-Pipeline/cloudpeel/)
 
 An end-to-end, largely automated pipeline that turns individual orthorectified satellite scenes into a single color-balanced, seamless, cloud-filled mosaic — for both the multispectral (XS) and panchromatic (Pan) products, together with a mosaic-wide cloud mask.
 
 Documentation website, with every step's README and an API reference generated from the docstrings: <https://buckai-observatory.org/Automated-Cloud-Removal-and-Seamless-Satellite-Image-Mosaicking-Pipeline/>
+
+**Try it**
+
+- **In your browser, nothing to install:** [CloudPeel](https://buckai-observatory.org/Automated-Cloud-Removal-and-Seamless-Satellite-Image-Mosaicking-Pipeline/cloudpeel/) shows mosaics made with this pipeline before and after cloud filling; change the cloud tolerance and SSIM threshold and see the result change.
+- **On your computer:** after [installation](#installation), `python examples/sentinel2_demo/run_demo.py --workdir demo_output` runs Steps 2–4 on free Sentinel-2 imagery (see [Try it: Sentinel-2 demo](#try-it-sentinel-2-demo)).
 
 If you use this code, please cite the accompanying paper:
 
