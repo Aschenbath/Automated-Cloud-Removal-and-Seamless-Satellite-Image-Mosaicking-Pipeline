@@ -116,10 +116,17 @@ def relink(text: str, source: str) -> str:
     return LINK.sub(one, text)
 
 
+HOME_LINK = re.compile(re.escape(SITE_URL) + r"[)>]")
+
+
+def drop_home_links(text: str) -> str:
+    """Remove the lines that link to the site's home page: the site does not link
+    to itself. Links to other pages of the site, such as CloudPeel, are kept."""
+    return "\n".join(l for l in text.splitlines() if not HOME_LINK.search(l)) + "\n"
+
+
 def md_page(source: str) -> tuple[str, str]:
-    text = (REPO / source).read_text()
-    # the home page does not link to itself
-    text = "\n".join(l for l in text.splitlines() if SITE_URL not in l) + "\n"
+    text = drop_home_links((REPO / source).read_text())
     m = H1.search(text)
     title = m.group(1).strip() if m else Path(source).stem
     if m:
