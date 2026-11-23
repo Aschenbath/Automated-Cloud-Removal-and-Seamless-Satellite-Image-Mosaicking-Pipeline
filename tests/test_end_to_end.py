@@ -23,9 +23,13 @@ from scipy.ndimage import gaussian_filter
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
-# Keep the complete pipeline free of the deprecations reported in issue #48.
+# Check the pipeline's own warnings. Rasterio 1.4 (used on Python 3.10) still
+# calls Affine.__mul__ internally, outside the step scripts' control.
 pytestmark = [
-    pytest.mark.filterwarnings("error::PendingDeprecationWarning"),
+    pytest.mark.filterwarnings(
+        r"error::PendingDeprecationWarning:"
+        r"^(.+\.)?(step2mosaic|mosaicPan_block_rs|step4cloud_removal)$"
+    ),
     pytest.mark.filterwarnings("error:The inplace keyword"),
     pytest.mark.filterwarnings("error:.*keep_geom_type"),
 ]
