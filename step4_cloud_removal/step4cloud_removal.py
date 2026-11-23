@@ -161,15 +161,15 @@ def score_candidates(candidate_files, cloud_files, candidate_folder, cloud_folde
                         mosaic_rgb=np.dstack((mosaic_xs.read(3,window=ints_window)/img_bits, mosaic_xs.read(2,window=ints_window)/img_bits,mosaic_xs.read(1,window=ints_window)/img_bits)).astype('uint8')
                         mosaic_rgb_masked=mosaic_rgb.copy()
                         for d in range(3):
-                            mosaic_rgb_masked[:,:,d][np.where(cld==1)]=0 # hallow the cld rgb
+                            mosaic_rgb_masked[:,:,d][np.where(cld==1)]=0 # hollow the cld rgb
 
                         bigImg2gray=cv2.cvtColor(mosaic_rgb,cv2.COLOR_RGB2GRAY)
-                        bigImg2gray[np.where(cld==1)]=0# hallow the cld gray
+                        bigImg2gray[np.where(cld==1)]=0# hollow the cld gray
 
                         imgrgb= np.dstack((imagePool.read(3,window=write_window)/img_bits, imagePool.read(2,window=write_window)/img_bits,imagePool.read(1,window=write_window)/img_bits)).astype('uint8')
                         imgRGB=imgrgb.copy()
                         for d in range(3):
-                            imgRGB[:,:,d][np.where(cld==1)]=0 # hallow the cld rgb
+                            imgRGB[:,:,d][np.where(cld==1)]=0 # hollow the cld rgb
 
 
                         tw6mMask=land_sea_mask.read(1,window=ints_window_tw6m)
@@ -283,7 +283,7 @@ def main():
              [x , y, w, h] = bbox
              cv2.rectangle(dilation, (x-10, y-10), (x + w + 10, y + h + 10), (255,0, 0), 3)
 
-        out = img*125 + dilation # can show picture by combining dilation and object detecton retangle
+        out = img*125 + dilation # can show picture by combining dilation and object detection rectangle
 
         if i==0:
             cdc=min(cd1[i][0],cd1[i+1][0])
@@ -292,7 +292,7 @@ def main():
             cdc=cd1[i+1][0]
             cdr=cd1[i+1][1]
 
-        print('cloud spiliting...',i+1,'/',len(allWindow))
+        print('cloud splitting...',i+1,'/',len(allWindow))
         c=0
         for bbox in bounding_boxes:
             c+=1
@@ -362,7 +362,7 @@ def main():
                                 mosaic_xs, land_sea_mask, res, imgBits, excluded_scenes)
 
         mosaic_xs.close()
-        # to use possion or feather to mend cloud hole from the full extent Taiwan image.
+        # to use Poisson or feather to mend cloud hole from the full extent Taiwan image.
         a=0
         print('cloud removal...',i+1,'/',len(allWindow))
         for j in cldfile:
