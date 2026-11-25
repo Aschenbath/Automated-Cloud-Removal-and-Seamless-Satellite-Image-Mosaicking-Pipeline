@@ -1,7 +1,7 @@
 """Run real Step 2 mosaics whose flood-filled components fall below 1000 pixels.
 
 The synthetic tilted footprints use the Sentinel-2 demo's geometry helpers.
-Only GDAL's CRS-copy command is replaced, by Rasterio for the same input CRS.
+Input enumeration is fixed, and Rasterio supplies GDAL's matching-CRS copy.
 Polygonization, seamline search, flood fill, component selection and blending
 all run normally.
 """
@@ -77,6 +77,10 @@ def run_mosaic(step2, demo, directory, monkeypatch, scale, third=False):
         return blend_mask(blend_pixels, mask)
 
     monkeypatch.setattr(step2, "assign_crs_copy", lambda src, dst, crs: copy(src, dst, driver="GTiff"))
+    # This fixture exercises the initial pair before the later small crop.
+    # Filesystem enumeration order varies between platforms and test runs.
+    listdir = step2.listdir
+    monkeypatch.setattr(step2, "listdir", lambda path: sorted(listdir(path)))
     monkeypatch.setattr(step2.cv2, "connectedComponents", observe_components)
     monkeypatch.setattr(step2, "blendMask", observe_blend)
     monkeypatch.chdir(directory)
