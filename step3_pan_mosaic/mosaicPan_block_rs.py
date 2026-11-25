@@ -162,7 +162,7 @@ def main():
             img2 = rasterio.open(new_rawPath+os.sep+image2_ds+'.tif')
             seamline_polygon = rasterio.open(slPath)
 
-            mosaic_pan_gt = A.translation(float(min( gt_two)), float(max( gt_five))) *  A.scale(res, -res)
+            mosaic_pan_gt = A.translation(float(min( gt_two)), float(max( gt_five))) @  A.scale(res, -res)
 
             mosaic_out= rasterio.open(
                 'mosaic_pan.tif',

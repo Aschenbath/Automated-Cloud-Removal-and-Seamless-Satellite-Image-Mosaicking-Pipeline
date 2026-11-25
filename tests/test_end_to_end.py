@@ -23,6 +23,17 @@ from scipy.ndimage import gaussian_filter
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
+# Check the pipeline's own warnings. Rasterio 1.4 (used on Python 3.10) still
+# calls Affine.__mul__ internally, outside the step scripts' control.
+pytestmark = [
+    pytest.mark.filterwarnings(
+        r"error::PendingDeprecationWarning:"
+        r"^(.+\.)?(step2mosaic|mosaicPan_block_rs|step4cloud_removal)$"
+    ),
+    pytest.mark.filterwarnings("error:The inplace keyword"),
+    pytest.mark.filterwarnings("error:.*keep_geom_type"),
+]
+
 # A 6 km x 6 km area: 300 x 300 XS pixels at 20 m, 600 x 600 Pan pixels at 10 m.
 AOI = (200000, 2500000, 206000, 2506000)
 PRIMARY = [

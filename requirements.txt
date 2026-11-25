@@ -8,6 +8,8 @@ numpy
 # from OpenCV 4.11 on, which leaves clouds in place; 4.10 behaves correctly.
 opencv-python>=4.5,<4.11
 rasterio
+# Affine 3 provides the non-deprecated @ composition operator.
+affine>=3.0
 geopandas
 shapely
 networkx
