@@ -89,8 +89,8 @@ def add_at_pos(matrix1, matrix2, xypos, inPlace=True):
    
     x2min = max(0, -x)
     y2min = max(0, -y)
-    x2max = min(-x + w1, w2)
-    y2max = min(-y + h1, h2)
+    x2max = max(min(-x + w1, w2), 0)
+    y2max = max(min(-y + h1, h2), 0)
     if inPlace:      
         matrix1[y1min:y1max, x1min:x1max] += matrix2[y2min:y2max, x2min:x2max]
     else:
