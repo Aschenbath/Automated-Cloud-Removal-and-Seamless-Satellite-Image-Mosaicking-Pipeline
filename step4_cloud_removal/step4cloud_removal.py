@@ -140,14 +140,13 @@ def score_candidates(candidate_files, cloud_files, candidate_folder, cloud_folde
             cldWin6m=Window((cld_gt[2]-mask_origin[0])/res,(mask_origin[1]-cld_gt[5])/res, width=cld_ds.width ,height=cld_ds.height  )   #full cld mask
 
             for b, k in enumerate(candidate_files):
-                with rasterio.open(join(candidate_folder, k)) as imagePool:
+                try:
+                    with rasterio.open(join(candidate_folder, k)) as imagePool:
 
-                    gt1=imagePool.transform
+                        gt1=imagePool.transform
 
-                    imgWin=Window((gt1[2]-mosaic_origin[0])/res,(mosaic_origin[1]-gt1[5])/res,  width=imagePool.width ,height=imagePool.height  )
-                    tw6mWin=Window((gt1[2]-mask_origin[0])/res,(mask_origin[1]-gt1[5])/res,  width=imagePool.width ,height=imagePool.height  )
-
-                    try:
+                        imgWin=Window((gt1[2]-mosaic_origin[0])/res,(mosaic_origin[1]-gt1[5])/res,  width=imagePool.width ,height=imagePool.height  )
+                        tw6mWin=Window((gt1[2]-mask_origin[0])/res,(mask_origin[1]-gt1[5])/res,  width=imagePool.width ,height=imagePool.height  )
 
                         ints_window=windows.intersection(imgWin, cldWin)  #big taiwan
                         ints_window_tw6m=windows.intersection(tw6mWin, cldWin6m)  #tw6m
@@ -184,18 +183,18 @@ def score_candidates(candidate_files, cloud_files, candidate_folder, cloud_folde
                             ssim[b,a]=-3
                         if np.all(imgRGB[cld==0]==0):# to exclude the image whose intersecting area only contains 0.
                             ssim[b,a]=-3
-                    except rasterio.errors.WindowError as error:
-                        logger.debug("SSIM scoring skipped for patch %s, candidate %s: %s", j, k, error)
-                        ssim[b,a]=-1
-                    except Exception as error:
-                        logger.warning("SSIM scoring failed for patch %s, candidate %s: %s",
-                                       j, k, error, exc_info=True)
-                        ssim[b,a]=-1
+                except rasterio.errors.WindowError as error:
+                    logger.debug("SSIM scoring skipped for patch %s, candidate %s: %s", j, k, error)
+                    ssim[b,a]=-1
+                except Exception as error:
+                    logger.warning("SSIM scoring failed for patch %s, candidate %s: %s",
+                                   j, k, error, exc_info=True)
+                    ssim[b,a]=-1
 
-                    finally:
-                        if any(k == order[order.find(k[:2]):order.find(k[:2]) + len(k)]
-                               for order in excluded_scenes):
-                            ssim[b,a]=-2
+                finally:
+                    if any(k == order[order.find(k[:2]):order.find(k[:2]) + len(k)]
+                           for order in excluded_scenes):
+                        ssim[b,a]=-2
     return ssim
 
 def main():
@@ -335,16 +334,11 @@ def main():
 
         if i ==0:
             files = listdir(candidate_img_path)
-            gt_two=[]
             file=[]
-            gt_five=[]
             for f in files:
               fullpath1 = join(candidate_img_path, f)
               if isfile(fullpath1) and  f.endswith(".img"):
-                with rasterio.open(candidate_img_path+os.sep+f) as image:
-                    file.append(f)
-                    gt_two.append(image.transform[2] )
-                    gt_five.append(image.transform[5] )
+                file.append(f)
 
 
         files = listdir(cloud_work_path)
