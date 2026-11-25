@@ -54,9 +54,13 @@ def main():
             if "data/datasets.json" not in names or any(
                     n.startswith("/") or ".." in pathlib.PurePosixPath(n).parts for n in names):
                 sys.exit("Unexpected archive layout; expected data/datasets.json and data/<region>/...")
-            if data.exists():
-                shutil.rmtree(data)
-            z.extractall(SITE)
+            # Finish extraction before removing an installed dataset. A CRC or
+            # write error must not replace working images with a partial archive.
+            with tempfile.TemporaryDirectory(prefix=".cloudpeel-", dir=SITE) as staged:
+                z.extractall(staged)
+                if data.exists():
+                    shutil.rmtree(data)
+                (pathlib.Path(staged) / "data").replace(data)
     print(f"Unpacked into {data}")
 
 

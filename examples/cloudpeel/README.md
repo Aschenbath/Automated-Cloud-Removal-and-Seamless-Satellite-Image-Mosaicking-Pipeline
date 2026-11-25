@@ -29,6 +29,10 @@ cd examples/cloudpeel
 python fetch_data.py
 ```
 
+Use `python fetch_data.py --force` to replace an installed image set. The new
+archive is fully unpacked in a temporary folder under `site/` before replacing
+`site/data/`, so a corrupt archive leaves the installed files intact.
+
 ## Demo on any computer
 
 The site is plain files, so any computer with Python 3 can show it; the pipeline
