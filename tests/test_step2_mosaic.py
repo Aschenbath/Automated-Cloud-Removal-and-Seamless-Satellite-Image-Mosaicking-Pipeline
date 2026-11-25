@@ -18,6 +18,28 @@ def test_add_at_pos_clips_off_edges(step2):
     assert out[2:4, 0:2].all()
 
 
+@pytest.mark.parametrize("position", [
+    (5, 0), (6, 0), (0, 5), (0, 6), (6, 6),
+    (-3, 0), (-4, 0), (0, -3), (0, -4), (-4, -4),
+])
+@pytest.mark.parametrize("in_place", [True, False])
+def test_add_at_pos_without_overlap(step2, position, in_place):
+    """An entirely off-canvas source leaves the destination unchanged."""
+    original = np.arange(25).reshape(5, 5)
+    canvas = original.copy()
+    source = np.ones((3, 3), dtype=canvas.dtype)
+
+    result = step2.add_at_pos(canvas, source, position, inPlace=in_place)
+
+    np.testing.assert_array_equal(canvas, original)
+    np.testing.assert_array_equal(source, 1)
+    if in_place:
+        assert result is None
+    else:
+        assert not np.shares_memory(result, canvas)
+        np.testing.assert_array_equal(result, original)
+
+
 def test_spiral_starts_at_origin_and_is_unique(step2):
     pts = step2.spiral(5, 5)
     assert pts[0] == [0, 0]

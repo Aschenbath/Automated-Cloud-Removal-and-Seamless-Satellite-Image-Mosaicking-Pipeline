@@ -178,6 +178,8 @@ def main():
                 final_native = src.read(1)
             left_px = int((final_native == 1).sum())
             flagged_px = int((final_native >= 10).sum())
+            # An already-clear input has no cloud area left to fill.
+            filled_fraction = 1 - left_px / cloudy_px if cloudy_px else 1.0
             rgb, _ = warp_to_web(run_dir / "mosaic_xs.tif", Resampling.bilinear, [3, 2, 1])
             save_rgb(rgb, limits, out / "img" / f"after_{k}.png")
             final_mask, _ = warp_to_web(run_dir / "mosaic_cloudmask.tif", Resampling.nearest, is_mask=True)
@@ -185,7 +187,7 @@ def main():
             runs[k] = {
                 "cloud_tolerance": tol, "ssim_threshold": ssim,
                 "patches_filled": filled, "patches_total": total,
-                "cloudy_area_filled_pct": round(100 * (1 - left_px / cloudy_px), 1),
+                "cloudy_area_filled_pct": round(100 * filled_fraction, 1),
                 "cloud_left_km2": round(left_px * px_area_km2, 2),
                 "flagged_km2": round(flagged_px * px_area_km2, 2),
                 "step4_seconds": round(elapsed, 1),

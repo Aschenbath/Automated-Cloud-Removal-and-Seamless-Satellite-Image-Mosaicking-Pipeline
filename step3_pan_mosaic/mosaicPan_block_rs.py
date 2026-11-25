@@ -90,7 +90,7 @@ def main():
         if i!=0:
             print('Image Process Progress:',i+2,'/',len(ReadOrder))
             img1_ori = ReadOrder[i+1][ReadOrder[i+1].find(StartLetter):ReadOrder[i+1].find(StartLetter)+8]
-            image1_ds = StartLetter+str(int(ReadOrder[i+1][ReadOrder[i+1].find('0'):ReadOrder[i+1].find(StartLetter)+8])+1).zfill(7)+('.img')#
+            image1_ds = StartLetter+str(int(ReadOrder[i+1][ReadOrder[i+1].find(StartLetter)+1:ReadOrder[i+1].find(StartLetter)+8])+1).zfill(7)+('.img')#
             image2_ds = 'mosaic_pan.tif'#
 
             raw1Path = pathlib.Path(pan_scene_path('raw_pan', image1_ds[:-4].upper())).absolute()
@@ -133,8 +133,8 @@ def main():
             print('Image Process Progress: 1,2','/',len(ReadOrder))
             img1_ori=ReadOrder[i][ReadOrder[i].find(StartLetter):ReadOrder[i].find(StartLetter)+8]
             img2_ori=ReadOrder[i+1][ReadOrder[i+1].find(StartLetter):ReadOrder[i+1].find(StartLetter)+8]
-            image1_ds= StartLetter+str(int(ReadOrder[i][ReadOrder[i].find('0'):ReadOrder[i].find(StartLetter)+8])+1).zfill(7)+('.img')#spot
-            image2_ds =StartLetter+str(int(ReadOrder[i+1][ReadOrder[i+1].find('0'):ReadOrder[i+1].find(StartLetter)+8])+1).zfill(7)+('.img')#spot
+            image1_ds= StartLetter+str(int(ReadOrder[i][ReadOrder[i].find(StartLetter)+1:ReadOrder[i].find(StartLetter)+8])+1).zfill(7)+('.img')#spot
+            image2_ds =StartLetter+str(int(ReadOrder[i+1][ReadOrder[i+1].find(StartLetter)+1:ReadOrder[i+1].find(StartLetter)+8])+1).zfill(7)+('.img')#spot
 
             raw1Path = pathlib.Path(pan_scene_path('raw_pan', image1_ds[:-4].upper())).absolute()
             raw2Path = pathlib.Path(pan_scene_path('raw_pan', image2_ds[:-4].upper())).absolute()

@@ -24,6 +24,7 @@ import json
 import shutil
 import pathlib
 import sys
+import urllib.parse
 import urllib.request
 
 import numpy as np
@@ -44,11 +45,34 @@ STRIPS = [(5500, 11000, 8000, 18000), (10500, 11500, 8000, 16000), (15500, 10500
 
 
 def search(aoi_ll, start, end):
+    """Return covered acquisition dates across all STAC result pages."""
     body = {"collections": ["sentinel-2-l2a"], "datetime": f"{start}T00:00:00Z/{end}T23:59:59Z",
             "intersects": box(*aoi_ll).__geo_interface__,
             "query": {"eo:cloud_cover": {"lt": 85}}, "limit": 200}
-    req = urllib.request.Request(SEARCH, json.dumps(body).encode(), {"Content-Type": "application/json"})
-    items = json.load(urllib.request.urlopen(req))["features"]
+    headers = {"Content-Type": "application/json"}
+    req = urllib.request.Request(SEARCH, json.dumps(body).encode(), headers)
+    items = []
+    while True:
+        with urllib.request.urlopen(req) as response:
+            page = json.load(response)
+            page_url = response.geturl()
+        items.extend(page["features"])
+        next_link = next((link for link in page.get("links", []) if link["rel"] == "next"), None)
+        if next_link is None:
+            break
+        next_body = next_link.get("body")
+        next_headers = dict(next_link.get("headers", {}))
+        if next_link.get("merge", False):
+            # STAC merges paging fields into the original search, not the previous page.
+            next_body = {**body, **(next_body or {})}
+            next_headers = {**headers, **next_headers}
+        if next_body is not None and not any(name.lower() == "content-type" for name in next_headers):
+            next_headers["Content-Type"] = "application/json"
+        req = urllib.request.Request(
+            urllib.parse.urljoin(page_url, next_link["href"]),
+            data=json.dumps(next_body).encode() if next_body is not None else None,
+            headers=next_headers, method=next_link.get("method", "GET"),
+        )
     area = box(*aoi_ll)
     # Keep scenes that cover the whole area, one per date.
     by_date = {}

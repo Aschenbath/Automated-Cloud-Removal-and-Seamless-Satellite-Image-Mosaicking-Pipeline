@@ -89,8 +89,8 @@ def add_at_pos(matrix1, matrix2, xypos, inPlace=True):
    
     x2min = max(0, -x)
     y2min = max(0, -y)
-    x2max = min(-x + w1, w2)
-    y2max = min(-y + h1, h2)
+    x2max = max(min(-x + w1, w2), 0)
+    y2max = max(min(-y + h1, h2), 0)
     if inPlace:      
         matrix1[y1min:y1max, x1min:x1max] += matrix2[y2min:y2max, x2min:x2max]
     else:
@@ -338,6 +338,13 @@ def find_raster_intersect(raster1,raster2,res,scale_factor):
     res_union_new.to_file('res_union_new.shp') 
     return array1, array2, col1, row1, intersection,gt,intersection_points,union_gt,union_m,union_conn,res_union_new#,image1_dsf,image2_dsf
    
+def blend_mask_coverage(image, mask):
+    """Return the valid-pixel fraction of a mask, or zero for an empty mask."""
+    count = np.count_nonzero(mask)
+    if count == 0:
+        return 0.0
+    return round(np.count_nonzero(mask & (image > 0)) / count, 9)
+
 def blend_preprocess_for_order(image1_ds,mask_blurred_4chan,res,union_gt):
     """Place a single band into the union canvas and compute blend-order statistics."""
     image1_ds = rasterio.open(image1_ds)
@@ -350,8 +357,8 @@ def blend_preprocess_for_order(image1_ds,mask_blurred_4chan,res,union_gt):
     xypos1=( int((gt1[2]-union_gt[2])/res) , int((union_gt[5]-gt1[5])/res)  )  
     add_at_pos(b1, b2, xypos1, inPlace=True)
     
-    im1_0num=round(np.count_nonzero( (mask_blurred_4chan==0) & (b1>0)    ) / np.count_nonzero(mask_blurred_4chan==0),9)
-    im1_1num=round(np.count_nonzero( (mask_blurred_4chan==1) & (b1>0)    ) / np.count_nonzero(mask_blurred_4chan==1),9)
+    im1_0num=blend_mask_coverage(b1, mask_blurred_4chan==0)
+    im1_1num=blend_mask_coverage(b1, mask_blurred_4chan==1)
     return b1, im1_0num,im1_1num
 
 def mask_blend_preprocess_for_order(image1_ds,mask_blurred_4chan,res,union_gt):
@@ -418,10 +425,10 @@ def blend_preprocess_order_for_mosaic(image1_ds,image2_ds,mask_blurred_4chan,wri
            
             add_at_pos(b1d, b2d, xypos1, inPlace=True)            
           
-    im1_0num=round(np.count_nonzero( (mask_blurred_4chan==0) & (b1>0)    ) / sum(sum(mask_blurred_4chan==0)),9)
-    im1_1num=round(np.count_nonzero( (mask_blurred_4chan==1) & (b1>0)    ) / sum(sum(mask_blurred_4chan==1)),9)
-    im2_0num=round(np.count_nonzero( (mask_blurred_4chan==0) & (b1d>0)    ) / sum(sum(mask_blurred_4chan==0)),9)
-    im2_1num=round(np.count_nonzero( (mask_blurred_4chan==1) & (b1d>0)    ) / sum(sum(mask_blurred_4chan==1)),9)
+    im1_0num=blend_mask_coverage(b1, mask_blurred_4chan==0)
+    im1_1num=blend_mask_coverage(b1, mask_blurred_4chan==1)
+    im2_0num=blend_mask_coverage(b1d, mask_blurred_4chan==0)
+    im2_1num=blend_mask_coverage(b1d, mask_blurred_4chan==1)
              
     return b1,b1d,im1_0num,im1_1num,im2_0num,im2_1num
 
@@ -1099,8 +1106,8 @@ def find_raster_intersect_for_mosaic(raster1,raster2,mosaic_gt,res,scale_factor,
        
         res_diff_sep = res_diff['geometry'].values[0]
         
-        res_diff_sep_gdf = gpd.GeoDataFrame(res_diff_sep)
-        res_diff_sep_gdf.columns = ['geometry']
+        res_diff_parts = list(res_diff_sep.geoms) if hasattr(res_diff_sep, "geoms") else [res_diff_sep]
+        res_diff_sep_gdf = gpd.GeoDataFrame(geometry=res_diff_parts, crs=res_diff.crs)
       
       
         res_diff_sep_gdf["area"] = res_diff_sep_gdf.area/ 10**6
@@ -1111,7 +1118,7 @@ def find_raster_intersect_for_mosaic(raster1,raster2,mosaic_gt,res,scale_factor,
         flist=np.zeros((len(intersection_points),1))
        
         for i in range(len(intersection_points)):
-            aq=wkt.loads(points[i].wkt)    
+            aq=wkt.loads(Lpoints[i].wkt)
             flist[i]=fin.distance(aq)# 
             aw=np.argsort(flist[:,0])
         intersection_pointsN=[]
@@ -1479,6 +1486,8 @@ def main():
             classN_index=classN_ind.tolist()
             classN_index.reverse()
 
+            # Keep the flood-filled mask if no component selection below replaces it.
+            im_floodfill_f = im_floodfill
             cind=[]
             for i in classN_index:
                 if classN[i]>1000:
@@ -1812,6 +1821,8 @@ def main():
             classN_index=classN_ind.tolist()
             classN_index.reverse()
 
+            # Keep the flood-filled mask if no component selection below replaces it.
+            im_floodfill_f = im_floodfill
             cind=[]
             for i in classN_index:
                 if classN[i]>1000:
