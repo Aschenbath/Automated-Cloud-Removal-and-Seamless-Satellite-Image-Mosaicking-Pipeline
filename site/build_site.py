@@ -16,6 +16,7 @@ This script copies them into site/_build/, with
     scripts into api/ (read statically; nothing is imported or run).
 New files in docs/ appear on the site and in its navbar without further
 changes.
+Source Markdown and generated text files use UTF-8 on every platform.
 
 Usage (from the repository root, with quartodoc installed):
     python3 site/build_site.py
@@ -126,7 +127,7 @@ def drop_home_links(text: str) -> str:
 
 
 def md_page(source: str) -> tuple[str, str]:
-    text = drop_home_links((REPO / source).read_text())
+    text = drop_home_links((REPO / source).read_text(encoding="utf-8"))
     m = H1.search(text)
     title = m.group(1).strip() if m else Path(source).stem
     if m:
@@ -158,7 +159,7 @@ def main():
         dst = OUT / target
         dst.parent.mkdir(parents=True, exist_ok=True)
         title, body = md_page(source)
-        dst.write_text(body)
+        dst.write_text(body, encoding="utf-8")
         if source in PROJECT:
             project.append((target, PROJECT[source]))
         elif source in STEPS or source in DEMO:
@@ -172,7 +173,7 @@ def main():
     # quartodoc writes the sidebar on `quartodoc build`; an empty one lets
     # `quarto render` run on its own as well
     (OUT / "api").mkdir()
-    (OUT / "api" / "_sidebar.yml").write_text("website:\n  sidebar: []\n")
+    (OUT / "api" / "_sidebar.yml").write_text("website:\n  sidebar: []\n", encoding="utf-8")
     doc_items = "\n".join(f"      - href: {t}\n        text: \"{n}\"" for t, n in docs)
     step_items = "\n".join(f"          - href: {t}\n            text: \"{n}\"" for t, n in steps)
     project_items = "\n".join(f"          - href: {t}\n            text: \"{n}\"" for t, n in project)
@@ -216,7 +217,7 @@ format:
     css: styles.css
     toc: true
 
-""" + quartodoc_yaml())
+""" + quartodoc_yaml(), encoding="utf-8")
     print(f"wrote {len(docs) + len(steps) + len(project)} pages to {OUT}")
 
 
