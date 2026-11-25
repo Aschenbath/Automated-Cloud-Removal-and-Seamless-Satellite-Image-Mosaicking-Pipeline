@@ -105,6 +105,30 @@ def test_missing_pan_scene_is_reported(step4, cloud_run, caplog):
     assert "A0000002" in str(records[0].exc_info[1])
 
 
+@pytest.mark.parametrize("pan_input", ["missing", "unreadable", "partial"])
+def test_pan_preparation_failure_preserves_outputs(step4, cloud_run, pan_input):
+    cloud_run.write("candidates/A0000001.img", cloud_run.mosaic - 10)
+    cloud_run.write("masks/A0000001.tif", np.ones((64, 64), np.uint8))
+    if pan_input == "unreadable":
+        (cloud_run.root / "pan/A0000002.tif").write_text("not a raster")
+    elif pan_input == "partial":
+        cloud_run.write("pan/A0000002.tif", cloud_run.mosaic[0, :25, :25])
+
+    before = {}
+    for name in ("mosaic_xs.tif", "mosaic_pan.tif", "mosaic_cloudmask.tif"):
+        with rasterio.open(cloud_run.root / name) as src:
+            before[name] = src.read()
+
+    step4.main()
+
+    for name, original in before.items():
+        with rasterio.open(cloud_run.root / name) as src:
+            np.testing.assert_array_equal(src.read(), original, err_msg=name)
+    (row,) = fill_log(cloud_run)
+    assert row["filled"] == "no"
+    assert row["note"].startswith("error:")
+
+
 def test_valid_candidate_still_fills_without_warnings(step4, cloud_run, caplog):
     cloud_run.write("masks/A0000001.tif", np.ones((64, 64), np.uint8))
     cloud_run.write("pan/A0000002.tif", cloud_run.mosaic[0])

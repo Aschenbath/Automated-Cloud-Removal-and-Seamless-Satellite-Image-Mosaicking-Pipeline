@@ -550,46 +550,42 @@ def main():
 
                                             if code==0:
 
-                                                stage2+=1
-
-                                                Count+=1
                                                 outcome=outcome.astype(imgtype)
-
-                                                with rasterio.open(mosaic_xs_path, 'r+') as dst:
-                                                    dst.write(outcome,  window=ints_window)
+                                                win_transform = mosaic_xs.window_transform(ints_window)
                                                 mosaic_xs.close()
+
+                                                # Prepare the Pan blend before changing any output. A missing
+                                                # scene must not leave a cleared cloud mask and an XS-only fill.
+                                                #resize cldb mask to pan's res
+                                                mask_blurred_pan_chan=cv2.resize( mask_blurred_4chan[1,:,:],(int(mask_blurred_4chan[1,:,:].shape[1]*(res/pan_res)),int(mask_blurred_4chan[1,:,:].shape[0]*(res/pan_res))) ,interpolation=cv2.INTER_NEAREST)
+
+                                                #read big pan which is cldb mask's counterpart
+                                                with rasterio.open(mosaic_pan_path) as mosaic_pan:
+                                                    pan_window=from_bounds(win_transform[2], win_transform[5]-ints_window.height*res, win_transform[2]+ints_window.width*res, win_transform[5], mosaic_pan.transform)
+                                                    bigpan = mosaic_pan.read(1, window=pan_window)
+
+                                                #read pan_imagePool which is cldb mask's counterpart
+                                                PAN_fName=fName[0]+str(int(fName[fName.find('0'):fName.find('0')+7])+1).zfill(7)
+                                                with rasterio.open(pan_scene_path(Pan_Addr, PAN_fName)) as pan_imagePool:
+                                                    smallpan=pan_imagePool.read(1,window= from_bounds(win_transform[2], win_transform[5]-ints_window.height*res, win_transform[2]+ints_window.width*res, win_transform[5], pan_imagePool.transform))
+                                                if smallpan.shape != mask_blurred_pan_chan.shape or bigpan.shape != mask_blurred_pan_chan.shape:
+                                                    raise ValueError('Pan inputs do not cover the complete cloud patch')
+                                                pan_outcome=(smallpan.astype(imgtype) * mask_blurred_pan_chan + bigpan.astype(imgtype) *( 1-mask_blurred_pan_chan) ).astype(imgtype)
 
                                                 with rasterio.open(cloudmask_path) as cloudmask:
                                                     taicld=cloudmask.read(1,window=ints_window_TaicldWin)
                                                 taicld[np.where((cld==255) & (temp!=1) & (tw6mMask==1))]=0
                                                 taicld[np.where( (temp==1) & (tw6mMask==1) ) ]=(i+1)*10
+
+                                                with rasterio.open(mosaic_xs_path, 'r+') as dst:
+                                                    dst.write(outcome, window=ints_window)
                                                 with rasterio.open(cloudmask_path, 'r+') as dst:
-                                                    dst.write(taicld.astype(imgtype),1,  window=ints_window_TaicldWin)
-
-                                                #resize cldb mask to pan's res
-                                                mask_blurred_pan_chan=cv2.resize( mask_blurred_4chan[1,:,:],(int(mask_blurred_4chan[1,:,:].shape[1]*(res/pan_res)),int(mask_blurred_4chan[1,:,:].shape[0]*(res/pan_res))) ,interpolation=cv2.INTER_NEAREST)
-
-
-                                                #read big pan which is cldb mask's counterpart
-                                                with rasterio.open( mosaic_xs_path) as src:
-
-                                                    win_transform = src.window_transform(ints_window)
-                                                    panBounds=from_bounds(win_transform[2], win_transform[5]-ints_window.height*res, win_transform[2]+ints_window.width*res, win_transform[5], src.transform)
-                                                mosaic_pan= rasterio.open( mosaic_pan_path,'r+')
-                                                bigpan = mosaic_pan.read(1 ,window=from_bounds(win_transform[2], win_transform[5]-ints_window.height*res, win_transform[2]+ints_window.width*res, win_transform[5], mosaic_pan.transform))
-                                                mosaic_pan.close()
-
-
-                                                #read pan_imagePool which is cldb mask's counterpart
-                                                PAN_fName=fName[0]+str(int(fName[fName.find('0'):fName.find('0')+7])+1).zfill(7)
-                                                pan_imagePool = rasterio.open(pan_scene_path(Pan_Addr, PAN_fName))
-
-                                                smallpan=pan_imagePool.read(1,window= from_bounds(win_transform[2], win_transform[5]-ints_window.height*res, win_transform[2]+ints_window.width*res, win_transform[5], pan_imagePool.transform))
-                                                pan_imagePool.close()
-                                                outcome=(smallpan.astype(imgtype) * mask_blurred_pan_chan + bigpan.astype(imgtype) *( 1-mask_blurred_pan_chan) ).astype(imgtype)
-                                                with rasterio.open( mosaic_pan_path,'r+') as dst:
-                                                    dst.write( outcome, 1, window= from_bounds(win_transform[2], win_transform[5]-ints_window.height*res, win_transform[2]+ints_window.width*res, win_transform[5], dst.transform ) )
-                                                del outcome,smallpan,bigpan
+                                                    dst.write(taicld.astype(imgtype), 1, window=ints_window_TaicldWin)
+                                                with rasterio.open(mosaic_pan_path, 'r+') as dst:
+                                                    dst.write(pan_outcome, 1, window=pan_window)
+                                                del outcome,smallpan,bigpan,pan_outcome
+                                                stage2+=1
+                                                Count+=1
                                                 ss=1
                                                 log_row['filled']='yes'
                                         elif np.any(imgrgb[0,:,:][cld==1]==0):
