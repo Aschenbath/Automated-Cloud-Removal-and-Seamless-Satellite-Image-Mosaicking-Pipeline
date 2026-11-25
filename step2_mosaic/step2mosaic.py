@@ -1099,8 +1099,8 @@ def find_raster_intersect_for_mosaic(raster1,raster2,mosaic_gt,res,scale_factor,
        
         res_diff_sep = res_diff['geometry'].values[0]
         
-        res_diff_sep_gdf = gpd.GeoDataFrame(res_diff_sep)
-        res_diff_sep_gdf.columns = ['geometry']
+        res_diff_parts = list(res_diff_sep.geoms) if hasattr(res_diff_sep, "geoms") else [res_diff_sep]
+        res_diff_sep_gdf = gpd.GeoDataFrame(geometry=res_diff_parts, crs=res_diff.crs)
       
       
         res_diff_sep_gdf["area"] = res_diff_sep_gdf.area/ 10**6
@@ -1111,7 +1111,7 @@ def find_raster_intersect_for_mosaic(raster1,raster2,mosaic_gt,res,scale_factor,
         flist=np.zeros((len(intersection_points),1))
        
         for i in range(len(intersection_points)):
-            aq=wkt.loads(points[i].wkt)    
+            aq=wkt.loads(Lpoints[i].wkt)
             flist[i]=fin.distance(aq)# 
             aw=np.argsort(flist[:,0])
         intersection_pointsN=[]
