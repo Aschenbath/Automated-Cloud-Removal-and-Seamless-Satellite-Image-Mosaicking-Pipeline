@@ -102,6 +102,22 @@ def test_candidate_scores_without_cloud_patches(step4, scene_pool):
     assert score_pool(step4, scene_pool(1, 0)).shape == (1, 0)
 
 
+@pytest.mark.parametrize("missing", [False, True])
+def test_unreadable_candidate_is_rejected_without_losing_other_scores(step4, scene_pool, missing):
+    pool = scene_pool(2, 2)
+    candidate = pool.candidates / pool.candidate_files[0]
+    if missing:
+        candidate.unlink()
+    else:
+        candidate.write_bytes(b"not a raster")
+    scores = score_pool(step4, pool)
+    np.testing.assert_array_equal(scores[0], -1)
+    np.testing.assert_allclose(scores[1], 1)
+
+    excluded = score_pool(step4, pool, ("['scene_000.img']",))
+    np.testing.assert_array_equal(excluded[0], -2)
+    np.testing.assert_allclose(excluded[1], 1)
+
 @pytest.mark.parametrize("col,row", [(0, 0), (16, 0), (0, 16), (16, 16)])
 @pytest.mark.parametrize("partial", [False, True])
 def test_overlap_penalty_is_independent_of_patch_origin(step4, scene_pool, col, row, partial):
