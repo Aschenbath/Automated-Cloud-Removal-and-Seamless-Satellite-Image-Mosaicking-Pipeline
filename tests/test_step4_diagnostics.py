@@ -70,6 +70,20 @@ def test_scoring_failure_names_patch_candidate_and_error(step4, cloud_run, caplo
     assert records[0].exc_info[0] is IndexError
 
 
+def test_unreadable_candidate_does_not_prevent_a_valid_fill(step4, cloud_run, caplog):
+    (cloud_run.root / "candidates/A0000003.img").write_bytes(b"not a raster")
+    cloud_run.write("masks/A0000001.tif", np.ones((64, 64), np.uint8))
+    cloud_run.write("pan/A0000002.tif", cloud_run.mosaic[0])
+    step4.main()
+    records = failures(caplog)
+    assert len(records) == 1
+    assert "SSIM scoring" in records[0].message
+    assert "1_cld.img" in records[0].message and "A0000003.img" in records[0].message
+    assert records[0].exc_info[0] is rasterio.errors.RasterioIOError
+    with rasterio.open(cloud_run.root / "mosaic_cloudmask.tif") as result:
+        assert np.all(result.read(1)[20:30, 20:30] == 0)
+
+
 def test_missing_cloud_mask_is_reported(step4, cloud_run, caplog):
     step4.main()
     records = failures(caplog)
