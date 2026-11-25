@@ -177,7 +177,7 @@ def score_candidates(candidate_files, cloud_files, candidate_folder, cloud_folde
                         imgRGB[tw6mMask==0]=0
 
 
-                        ssim[b,a]=  structural_similarity(mosaic_rgb_masked, imgRGB, channel_axis=-1,data_range=255,K1=0.01,K2=0.03) if cld_window==cldWin else structural_similarity(mosaic_rgb_masked, imgRGB, channel_axis=-1,data_range=255,K1=0.01,K2=0.03)-0.05
+                        ssim[b,a]=  structural_similarity(mosaic_rgb_masked, imgRGB, channel_axis=-1,data_range=255,K1=0.01,K2=0.03) if ints_window==cldWin else structural_similarity(mosaic_rgb_masked, imgRGB, channel_axis=-1,data_range=255,K1=0.01,K2=0.03)-0.05
 
                         if np.all(mosaic_rgb_masked[:]==0) and np.all(imgRGB[:]==0):#to exclude the image which only contains 0.
                             ssim[b,a]=-3
