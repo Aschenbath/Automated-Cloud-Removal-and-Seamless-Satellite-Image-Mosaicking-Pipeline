@@ -61,6 +61,22 @@ conda install -c conda-forge gdal rasterio geopandas shapely
 pip install -r requirements.txt
 ```
 
+On macOS or Linux, a virtual environment with pip is another option (including
+Python 3.13). Install GDAL's command-line tools separately, for example
+`brew install gdal` on macOS or `sudo apt install gdal-bin` on Debian/Ubuntu,
+then run from the repository:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+```
+
+The pip packages do not install all the GDAL commands used by the pipeline.
+Make sure `gdalwarp`, `gdal_translate`, `gdal_polygonize.py` and `gdal_edit.py`
+are available on `PATH`. On Windows, the conda environment above also provides
+these tools.
+
 Alternatively, install the pipeline as a package (`pip install .` from a clone; it uses the same `requirements.txt`). This adds one command per step, each taking the prepared working folder (the folder with the step's parameter file) as its argument:
 
 ```bash
@@ -76,7 +92,7 @@ The folder must be prepared as for `python step*.py` (Step 2 also needs `NSPO_GR
 
 - **Python 3.10+** with the packages in `requirements.txt` (Steps 2–4 run on Windows, macOS and Linux)
 - **GDAL command-line tools** on `PATH` (`gdalwarp`, `gdal_translate`; conda-forge's `gdal` package provides them)
-- **ERDAS IMAGINE 2014** for Step 1 only (later versions, e.g. 2018/2020, may produce wrong colors). Without it, start at Step 2 with scenes color-balanced by any other tool.
+- **Windows and ERDAS IMAGINE 2014** for Step 1 only: its workflow also runs Windows `.bat` and `.exe` tools, including `MappingReshapeXS.exe` (later ERDAS versions, e.g. 2018/2020, may produce wrong colors). Without this environment, start at Step 2 with scenes color-balanced by any other tool.
 - Optional, Windows only: **MATLAB Runtime R2018a (v9.4)** for the original `GetBoundaryMask.exe` used in Step 2. Elsewhere, or if it is missing, Step 2 uses an equivalent pure-Python footprint polygonizer.
 
 > **OpenCV version:** Step 4 needs OpenCV < 4.11. From 4.11 on, `cv2.seamlessClone` keeps the destination texture and clouds are not removed. `requirements.txt` pins this, and the test suite checks it.
@@ -88,7 +104,7 @@ The folder must be prepared as for `python step*.py` (Step 2 also needs `NSPO_GR
 
 Input data (not included): orthorectified satellite XS scenes (`.raw`/`.img`) with matching Pan scenes and per-scene cloud masks (`.ers` or `.tif`), plus the Step-1 reference images.
 
-> **Configurable canvas extents:** the mosaic canvas bounds are set in each step's configuration file (`canvas_x_max`, `canvas_y_min`, `canvas_crs`). The defaults use the Taiwan TWD97 coordinate system (`EPSG:3826`). To mosaic imagery in another region, update these parameters in `para.txt`, `para_pan.txt`, and `para_cld.txt`.
+> **Configurable canvas extents:** Steps 2 and 3 read `canvas_x_max`, `canvas_y_min` and `canvas_crs` from `para.txt` and `para_pan.txt`. Step 4 reads only `canvas_crs` from `para_cld.txt`; it uses the prepared mosaics and Step 2 window/transform files for its extent. The defaults use Taiwan TWD97 (`EPSG:3826`). For another region, update the bounds in Steps 2 and 3 and use the same CRS throughout all three steps.
 
 > **Land/sea mask:** Step 4 requires a binary land/sea border mask raster (`1` = land, `0` = sea). This file is **not included**. Create or obtain one for your study area and set its path via `seaBorderAddress` in `para_cld.txt`. The mask must use the same CRS and pixel size (`res`) as the XS mosaic, be aligned to the XS pixel grid, and cover the mosaic extent. It does not need the same width, height or origin as the mosaic: Step 4 reads it by window in map coordinates (the Sentinel-2 demo's mask spans the whole area of interest and is larger than its mosaic).
 
@@ -142,6 +158,11 @@ step2/
 | `canvas_x_max` | Eastern bound of the mosaic canvas (map units) |
 | `canvas_y_min` | Southern bound of the mosaic canvas (map units) |
 
+The supplied `para.txt` and Sentinel-2 demo deliberately use `a6c` to keep the
+historical arithmetic used for the paper's method. Set `path_method` to
+`a6c_int` explicitly for new runs that should avoid uint8 wraparound; this can
+change the selected seamline.
+
 Outputs: `mosaic_xs.tif` (XS mosaic), `mosaic_cloudmask.tif` (cloud mask mosaic), `ProcessOrder.txt`, `transform.npy`, `allWindow.npy`, `ImgInd.npy`, `Union_gt.npy`, and two rasters per seamline:
 
 - `<scene1><scene2>_seamline.img` for the first pair and `<scene>_seamline.img` for each later scene: the raw seamline path (uint8, `1` on the seamline, `0` elsewhere) on the Step 2 grid. For inspection only; later steps do not read it.
@@ -153,7 +174,7 @@ If no seamline can be found through valid pixels of an overlap (for example when
 
 Folder: `step3_pan_mosaic/`.
 
-Copy from Step 2: `transform.npy`, `ImgInd.npy`, `allWindow.npy`, `Union_gt.npy`, `ProcessOrder.txt`, and all `*_seamline_polygon.img` (+`.ige`) files. Add `raw_pan/` and an empty `new_pan/`.
+Copy from Step 2: `transform.npy`, `ImgInd.npy`, `allWindow.npy`, `Union_gt.npy`, `ProcessOrder.txt`, and all `*_seamline_polygon.img` files, together with their `.aux.xml` sidecars when present (as in the Sentinel-2 demo). Step 2 does not require `.ige` files. Add `raw_pan/` and an empty `new_pan/`.
 
 Configure `para_pan.txt` (`res`, `trueBits`, `StartLetter`, `upscale_factor`, `canvas_crs`, `canvas_x_max`, `canvas_y_min`) and run `run.bat`. Output: `mosaic_pan.tif`.
 
@@ -177,6 +198,11 @@ step4/
 ```
 
 Two `para_cld.txt` settings control which candidates are used:
+
+Replace the template's `YOUR_PATH` placeholders with your paths. On macOS and
+Linux use forward slashes, for example `"CandiImgPath": "/data/cloud_database"`;
+forward slashes also work on Windows (`"CandiImgPath": "D:/data/cloud_database"`).
+If using Windows backslashes in JSON, escape them as `\\` as the template does.
 
 | Key | Meaning |
 |-----|---------|
