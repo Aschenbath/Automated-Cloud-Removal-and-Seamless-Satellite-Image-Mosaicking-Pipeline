@@ -436,7 +436,7 @@ def main():
                                         imgrgb=imagePool.read(window=write_window)
 
                                         thresh=1-cloud_tolerance
-                                        if np.any(imgrgb[0,:,:][cld==1]==0)==False and clear_fraction>thresh : #(cldb[cld==1]<10).all()==True   #cldb.all()<10
+                                        if patch_codes.size and np.any(imgrgb[0,:,:][cld==1]==0)==False and clear_fraction>=thresh : #(cldb[cld==1]<10).all()==True   #cldb.all()<10
                                             mosaic_xs= rasterio.open(mosaic_xs_path)
                                             code=0
                                             imgrgb=imagePool.read(window=write_window)/imgBits

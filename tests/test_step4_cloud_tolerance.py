@@ -92,3 +92,60 @@ def test_cloud_tolerance_counts_every_patch_pixel(step4, tolerance_run, monkeypa
     if not accepted:
         with rasterio.open(run.root / "mosaic_cloudmask.tif") as result:
             assert np.all(result.read(1)[20:30, 20:30] == 1)
+
+
+@pytest.mark.parametrize("tolerance,cloudy_rows,accepted", [
+    (0.0, 0, True), (0.0, 1, False),
+    (0.5, 6, True), (0.5, 7, True), (0.5, 8, False),
+])
+def test_cloud_tolerance_accepts_its_inclusive_limit(
+        step4, tolerance_run, monkeypatch, tolerance, cloudy_rows, accepted):
+    """Zero tolerance accepts clear scenes; the configured maximum is inclusive."""
+    import csv
+
+    run = tolerance_run
+    config_path = run.root / "para_cld.txt"
+    config = json.loads(config_path.read_text())
+    config["cloud_tolerance"] = tolerance
+    config_path.write_text(json.dumps(config))
+    cloud_codes = np.zeros((64, 64), np.uint8)
+    # The 10x10 cloud grows to rows 18:32 after the five-pixel dilation.
+    cloud_codes[18:18 + cloudy_rows] = 10
+    run.write("masks/A0000001.tif", cloud_codes)
+    run.write("pan/A0000002.tif", run.mosaic[0])
+    clones = []
+    clone = step4.seamless_clone_over_nodata
+
+    def record_clone(*args, **kwargs):
+        """Record whether the candidate reaches the real blending stage."""
+        clones.append(True)
+        return clone(*args, **kwargs)
+
+    monkeypatch.setattr(step4, "seamless_clone_over_nodata", record_clone)
+    step4.main()
+
+    with (run.root / "fill_log.csv").open(newline="") as stream:
+        row, = csv.DictReader(stream)
+    assert float(row["clear_fraction"]) == pytest.approx(1 - cloudy_rows / 14, abs=0.0001)
+    assert bool(clones) is accepted
+    assert row["filled"] == ("yes" if accepted else "no")
+
+
+def test_full_tolerance_still_requires_cloud_overlap(step4, tolerance_run):
+    """An empty overlap cannot fill cloud pixels even at maximum tolerance."""
+    import csv
+
+    run = tolerance_run
+    config_path = run.root / "para_cld.txt"
+    config = json.loads(config_path.read_text())
+    config["cloud_tolerance"] = 1.0
+    config_path.write_text(json.dumps(config))
+    run.write("candidates/A0000001.img", run.mosaic[:, :15])
+    run.write("masks/A0000001.tif", np.zeros((64, 64), np.uint8))
+    step4.main()
+
+    with (run.root / "fill_log.csv").open(newline="") as stream:
+        row, = csv.DictReader(stream)
+    assert row["clear_fraction"] == "0.0"
+    assert row["filled"] == "no"
+    assert not row["note"].startswith("error:")
