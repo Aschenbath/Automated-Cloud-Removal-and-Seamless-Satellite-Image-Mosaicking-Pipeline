@@ -119,6 +119,24 @@ def test_coastal_score_compares_the_same_land_pixels(step4, scene_pool, sea_valu
     pool.write_raster(pool.candidates / pool.candidate_files[0], candidate)
     assert score_pool(step4, pool)[0, 0] < 1
 
+@pytest.mark.parametrize("col,row", [(0, 0), (16, 0), (0, 16), (16, 16)])
+@pytest.mark.parametrize("partial", [False, True])
+def test_overlap_penalty_is_independent_of_patch_origin(step4, scene_pool, col, row, partial):
+    """Only incomplete candidate coverage incurs the partial-overlap penalty."""
+    from rasterio.transform import from_origin
+
+    pool = scene_pool(1, 1)
+    patch = np.zeros((32, 32), np.uint8)
+    patch[8:16, 8:16] = 1
+    pool.write_raster(pool.patches / pool.cloud_files[0], patch,
+                      from_origin(1000 + col * 60, 10000 - row * 60, 60, 60))
+    if partial:
+        pool.write_raster(pool.candidates / pool.candidate_files[0],
+                          pool.mosaic[:, :, :col + 24])
+
+    expected = 0.95 if partial else 1.0
+    assert score_pool(step4, pool)[0, 0] == pytest.approx(expected)
+
 
 @pytest.mark.parametrize("case,expected", [
     ("zero", -3), ("sea", -3), ("no_overlap", -1), ("missing_bands", -1),
