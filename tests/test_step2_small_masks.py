@@ -14,7 +14,9 @@ import numpy as np
 import pytest
 import rasterio
 from rasterio.shutil import copy
+from rasterio.transform import from_origin
 from rasterio.warp import reproject, Resampling
+from rasterio.windows import Window
 
 
 @pytest.fixture(scope="module")
@@ -82,6 +84,8 @@ def run_mosaic(step2, demo, directory, monkeypatch, scale, third=False):
 
     order = ast.literal_eval((directory / "ProcessOrder.txt").read_text())
     assert order == [path.name for path in scene_paths]
+    blend_orders = np.load(directory / "ImgInd.npy", allow_pickle=True)
+    assert all(np.isfinite(float(row[2])) for selection in blend_orders for row in selection)
     with rasterio.open(directory / "mosaic_xs.tif") as src:
         output = src.read()
         assert src.count == 4 and src.dtypes == ("uint16",) * 4
@@ -128,3 +132,36 @@ def test_empty_blend_mask_stays_empty(step2):
     weights = step2.blendMask(57, mask)
     np.testing.assert_array_equal(weights, np.zeros(mask.shape, np.float32))
     assert not mask.any()
+
+
+@pytest.mark.parametrize("iterative", [False, True], ids=["initial", "iterative"])
+@pytest.mark.parametrize("weights,first_coverage,second_coverage", [
+    pytest.param([[0.5] * 3] * 2, (0, 0), (0, 0), id="no-pure-weights"),
+    pytest.param([[0] * 3] * 2, (round(2 / 3, 9), 0), (round(2 / 3, 9), 0), id="no-ones"),
+    pytest.param([[1] * 3] * 2, (0, round(2 / 3, 9)), (0, round(2 / 3, 9)), id="no-zeros"),
+    pytest.param([[0, 0, 1], [1, 0.5, 1]], (0.5, round(2 / 3, 9)), (0.5, 1), id="nonempty"),
+])
+def test_blend_order_coverage_for_empty_and_nonempty_weight_classes(
+    step2, tmp_path, monkeypatch, iterative, weights, first_coverage, second_coverage,
+):
+    transform = from_origin(100, 200, 1, 1)
+    first = np.array([[10, 0, 30], [0, 50, 60]], np.uint16)
+    second = np.array([[0, 20, 30], [40, 0, 60]], np.uint16)
+    paths = [tmp_path / "incoming.tif", tmp_path / "running.tif"]
+    for path, data in zip(paths, (first, second)):
+        with rasterio.open(path, "w", driver="GTiff", width=3, height=2, count=1,
+                           dtype="uint16", crs="EPSG:3826", transform=transform) as dst:
+            dst.write(data, 1)
+    weights = np.array(weights, np.float32)
+    if iterative:
+        monkeypatch.setattr(step2, "union_gt", transform, raising=False)
+        monkeypatch.setattr(step2, "res", 1, raising=False)
+        placed, running, *coverage = step2.blend_preprocess_order_for_mosaic(
+            str(paths[0]), str(paths[1]), weights, Window(0, 0, 3, 2),
+        )
+        np.testing.assert_array_equal(running, second)
+        assert tuple(coverage) == first_coverage + second_coverage
+    else:
+        placed, *coverage = step2.blend_preprocess_for_order(str(paths[0]), weights, 1, transform)
+        assert tuple(coverage) == first_coverage
+    np.testing.assert_array_equal(placed, first)
