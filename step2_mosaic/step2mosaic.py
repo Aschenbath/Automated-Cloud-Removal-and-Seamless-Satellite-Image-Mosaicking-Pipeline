@@ -1479,6 +1479,8 @@ def main():
             classN_index=classN_ind.tolist()
             classN_index.reverse()
 
+            # Keep the flood-filled mask if no component selection below replaces it.
+            im_floodfill_f = im_floodfill
             cind=[]
             for i in classN_index:
                 if classN[i]>1000:
@@ -1812,6 +1814,8 @@ def main():
             classN_index=classN_ind.tolist()
             classN_index.reverse()
 
+            # Keep the flood-filled mask if no component selection below replaces it.
+            im_floodfill_f = im_floodfill
             cind=[]
             for i in classN_index:
                 if classN[i]>1000:
